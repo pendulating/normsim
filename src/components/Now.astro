@@ -1,0 +1,21 @@
+---
+import Section from './Section.astro';
+import { nowIntro, now } from '../data/now';
+---
+
+<Section id="now" title="What we're thinking about now">
+  <p>{nowIntro}</p>
+  <ol class="m-0 mt-5 grid list-none gap-4 p-0">
+    {
+      now.map((item, i) => (
+        <li class="card relative py-4 pr-5 pl-[3.4rem]">
+          <span class="font-display absolute top-4 left-[1.1rem] text-[1.1rem] font-bold" aria-hidden="true">
+            {String(i + 1).padStart(2, '0')}
+          </span>
+          <h3 class="mb-1.5 text-[1.05rem]">{item.title}</h3>
+          <p class="m-0 text-[0.98rem]">{item.body}</p>
+        </li>
+      ))
+    }
+  </ol>
+</Section>

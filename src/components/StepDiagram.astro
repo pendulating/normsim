@@ -1,0 +1,682 @@
+---
+/* Shared shell for the click-through training diagrams (SFT, GRPO, KTO). It
+   owns what the three have in common with the extraction diagram: a pipeline
+   row whose nodes light up per step, a stage whose views swap per step, the
+   stepper, and the live caption. Each diagram supplies its views as slot
+   content:
+
+     <div class="td-view" data-view-of="sample route">…</div>
+
+   The view shows while the current step's `view` is in its list; give the
+   final step's views the class `is-on` in markup so no-JS readers see it. Inside a
+   view, `data-show-from="k"` hides an element until step k (0-based), so a
+   view can build up across consecutive steps; `data-focus="1 3"` lights an
+   element on those steps, as on pipeline nodes.
+
+   Same motion contract as NormUniverseDiagram: autoplays once when scrolled
+   into view and holds on the final step; reduced motion and no-JS both show
+   the final step. Styles for slot content are :global but scoped under .td,
+   so the view primitives (.td-card, .td-pill, ...) are shared by all three. */
+
+export interface DiagramNode {
+  id: string;
+  title: string;
+  detail?: string;
+}
+
+export interface DiagramStep {
+  label: string;
+  /** Trusted HTML from our own data files (for <sub> in R<sub>direct</sub>). */
+  caption: string;
+  /** Pipeline node ids that are the focus of this step. */
+  focus: string[];
+  /** Which view the stage shows at this step. */
+  view: string;
+  /** Autoplay dwell in ms; dense steps get longer. */
+  dwell?: number;
+}
+
+interface Props {
+  name: string;
+  pipeline: DiagramNode[];
+  steps: DiagramStep[];
+  /** Draw a return arrow under the pipeline, from node `from` back to node `to`. */
+  loop?: { from: string; to: string; label: string };
+}
+
+const { name, pipeline, steps, loop } = Astro.props;
+const last = steps.length - 1;
+const focusOf = (id: string) =>
+  steps
+    .map((s, i) => (s.focus.includes(id) ? i : -1))
+    .filter((i) => i >= 0)
+    .join(' ');
+const cols = pipeline.map(() => 'minmax(0, 1fr)').join(' var(--td-arrow) ');
+const idx = (id: string) => pipeline.findIndex((n) => n.id === id);
+const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : '';
+---
+
+<div
+  class="td"
+  data-td
+  data-step={last}
+  data-view={steps[last].view}
+  data-views={steps.map((s) => s.view).join(' ')}
+  data-dwell={steps.map((s) => s.dwell ?? 0).join(' ')}
+  role="group"
+  aria-label={name}
+>
+  <div class="td-pipe" style={`grid-template-columns: ${cols}`} aria-hidden="true">
+    {
+      pipeline.map((n, i) => (
+        <Fragment>
+          {i > 0 && (
+            <svg class="td-arrow" viewBox="0 0 32 12">
+              <path d="M1 6h27" />
+              <path d="M24 2l5 4-5 4" class="td-head" />
+            </svg>
+          )}
+          <div class="td-node" data-focus={focusOf(n.id)}>
+            <span class="td-node-title">{n.title}</span>
+            {n.detail && <span class="td-node-detail">{n.detail}</span>}
+          </div>
+        </Fragment>
+      ))
+    }
+    {
+      loop && (
+        <div class="td-loop" style={`grid-column: ${loopCols}`} data-focus={focusOf('loop')}>
+          <span class="td-loop-label">{loop.label}</span>
+        </div>
+      )
+    }
+  </div>
+
+  <div class="td-stage">
+    <slot />
+  </div>
+
+  <div class="td-controls">
+    <ol class="td-stepper" aria-label={`${name}: steps`}>
+      {
+        steps.map((s, i) => (
+          <li>
+            <button type="button" class="td-step" data-goto={i} aria-current={i === last ? 'step' : undefined}>
+              {i + 1} · {s.label}
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="td-buttons">
+      <button type="button" class="td-btn" data-prev aria-label="Previous step">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <button type="button" class="td-btn" data-next aria-label="Next step">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+      </button>
+      <button type="button" class="td-btn" data-replay aria-label="Replay the animation">
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M4 12a8 8 0 1 0 2.4-5.7"></path><path d="M4 4v4.5h4.5"></path></svg
+        >
+      </button>
+    </div>
+  </div>
+
+  <p class="td-live" aria-live="polite">
+    {
+      steps.map((s, i) => (
+        <span data-caption={i} hidden={i !== last}>
+          <span class="td-live-label">
+            Step {i + 1} of {steps.length}: {s.label}.
+          </span>{' '}
+          <Fragment set:html={s.caption} />
+        </span>
+      ))
+    }
+  </p>
+</div>
+
+<style>
+  .td {
+    --td-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --td-ink-faint: rgba(var(--color-text-base), 0.16);
+    --td-ink-soft: rgba(var(--color-text-base), 0.4);
+    --td-arrow: 1.75rem;
+    position: relative;
+    overflow-x: clip;
+  }
+
+  /* ---------- Pipeline ---------- */
+  .td-pipe {
+    display: grid;
+    align-items: center;
+    max-width: 56rem;
+    margin: 0 auto;
+    font-size: 0.95rem;
+  }
+  .td-node {
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.1rem;
+    height: 100%;
+    padding: 0.55rem 0.5rem;
+    border: 1.5px solid var(--td-ink-faint);
+    border-radius: 0.5rem;
+    background: rgb(var(--color-card));
+    text-align: center;
+    line-height: 1.2;
+    transition: var(--theme-transition), border-color 0.45s ease;
+  }
+  .td-node-title {
+    font-weight: 700;
+  }
+  .td-node-detail {
+    font-weight: 500;
+    font-size: 0.82em;
+    opacity: 0.75;
+  }
+  .td-node.is-focus {
+    border-color: rgb(var(--color-accent));
+  }
+  .td-node.is-focus .td-node-title {
+    color: rgb(var(--color-accent));
+  }
+  .td-arrow {
+    grid-row: 1;
+    width: 100%;
+    height: 0.75rem;
+    fill: none;
+    stroke: var(--td-ink-soft);
+    stroke-width: 1.5;
+    overflow: visible;
+  }
+  .td-head {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Return arrow: a U under the row, from the last node back to the first. */
+  .td-loop {
+    grid-row: 2;
+    position: relative;
+    height: 1.6rem;
+    margin: 0 2.5rem;
+    border: 1.5px dashed var(--td-ink-soft);
+    border-top: 0;
+    border-radius: 0 0 0.6rem 0.6rem;
+    transition: border-color 0.45s ease;
+  }
+  .td-loop::after {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -0.33rem;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-top: 1.5px solid var(--td-ink-soft);
+    border-left: 1.5px solid var(--td-ink-soft);
+    transform: rotate(45deg);
+    transition: border-color 0.45s ease;
+  }
+  .td-loop-label {
+    position: absolute;
+    left: 50%;
+    bottom: -0.65em;
+    padding: 0 0.5rem;
+    transform: translateX(-50%);
+    background: rgb(var(--color-fill));
+    font-size: 0.78rem;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0.8;
+    transition: var(--theme-transition);
+  }
+  .td-loop.is-focus,
+  .td-loop.is-focus::after {
+    border-color: rgb(var(--color-accent));
+  }
+  .td-loop.is-focus .td-loop-label {
+    color: rgb(var(--color-accent));
+    opacity: 1;
+  }
+
+  /* ---------- Stage: all views share one grid cell ---------- */
+  .td-stage {
+    display: grid;
+    margin-top: 1.75rem;
+  }
+  /* Views share one cell, so the stage keeps the tallest view's height and
+     the controls never move; shorter views sit centred in it. */
+  .td :global(.td-view) {
+    grid-area: 1 / 1;
+    align-self: center;
+    min-width: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition:
+      opacity 0.5s ease,
+      transform 0.6s var(--td-ease),
+      visibility 0s linear 0.5s;
+  }
+  /* Narrow: stacked panels make views very different heights, so only the
+     active view takes space and the stage follows it. */
+  @media (max-width: 899px) {
+    .td-stage {
+      position: relative;
+    }
+    .td :global(.td-view:not(.is-on)) {
+      position: absolute;
+      inset: 0 0 auto;
+    }
+  }
+  .td :global(.td-view.is-on) {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition-delay: 0.15s, 0.15s, 0s;
+  }
+  .td :global([data-show-from]) {
+    transition:
+      opacity 0.5s ease 0.25s,
+      transform 0.6s var(--td-ease) 0.25s;
+  }
+  .td :global([data-show-from].is-hidden) {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: none;
+  }
+
+  /* ---------- View primitives, shared by the three diagrams ---------- */
+  .td :global(.td-card) {
+    min-width: 0;
+    padding: 0.9rem 1rem 1rem;
+    border: 1.5px solid var(--td-ink-faint);
+    border-radius: 0.6rem;
+    background: rgb(var(--color-card));
+    font-size: 0.875rem;
+    line-height: 1.5;
+    transition: var(--theme-transition), border-color 0.45s ease;
+  }
+  .td :global(.td-card.is-focus) {
+    border-color: rgba(var(--color-accent), 0.6);
+  }
+  .td :global(.td-inset) {
+    padding: 0.65rem 0.8rem 0.7rem;
+    border: 1px solid var(--td-ink-faint);
+    border-radius: 0.45rem;
+    background: rgb(var(--color-fill));
+    transition: var(--theme-transition), border-color 0.45s ease;
+  }
+  .td :global(.td-head-row) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.1rem 0.75rem;
+    margin: 0 0 0.6rem;
+  }
+  .td :global(.td-title) {
+    margin: 0;
+    font-size: 1rem;
+  }
+  .td :global(.td-meta),
+  .td :global(.td-note) {
+    font-size: 0.8rem;
+    font-weight: 500;
+    opacity: 0.75;
+  }
+  .td :global(.td-note) {
+    margin: 0.65rem 0 0;
+  }
+  .td :global(.td-pill) {
+    display: inline-block;
+    padding: 0.05rem 0.55rem;
+    border: 1px solid var(--td-ink-soft);
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .td :global(.td-pill-accent) {
+    border-color: rgb(var(--color-accent));
+    color: rgb(var(--color-accent));
+    font-weight: 700;
+  }
+  .td :global(.td-pills) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0.55rem 0 0;
+  }
+  .td :global(code),
+  .td :global(.td-code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    font-size: 0.75rem;
+  }
+  .td :global(.td-code) {
+    display: block;
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.55;
+  }
+  .td :global(.td-math) {
+    font-style: italic;
+    white-space: nowrap;
+  }
+  .td :global(.td-math sub) {
+    font-size: 0.7em;
+  }
+  .td :global(.td-mark) {
+    color: inherit;
+    background: rgba(var(--color-accent), 0.14);
+    border-bottom: 1.5px solid rgb(var(--color-accent));
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .td :global(.td-strike) {
+    text-decoration: line-through;
+    text-decoration-color: rgb(var(--color-accent));
+    text-decoration-thickness: 1.5px;
+    opacity: 0.6;
+  }
+  .td :global(.td-slots) {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 0.3rem 0.75rem;
+    margin: 0;
+  }
+  .td :global(.td-slots dt) {
+    font-size: 0.8rem;
+    font-weight: 500;
+    line-height: 1.6;
+    opacity: 0.75;
+  }
+  .td :global(.td-slots dd) {
+    margin: 0;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--td-ink-faint);
+    font-weight: 700;
+  }
+  .td :global(.td-sym) {
+    display: inline-block;
+    min-width: 0.9em;
+    font-style: italic;
+    font-weight: 700;
+  }
+  /* A row of panels with arrows between them on wide screens. */
+  .td :global(.td-flow) {
+    display: grid;
+    gap: 1rem;
+  }
+  @media (min-width: 900px) {
+    .td :global(.td-flow) {
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(0, 1fr);
+      gap: 2.5rem;
+    }
+    .td :global(.td-flow > * + *) {
+      position: relative;
+    }
+    .td :global(.td-flow > * + *::before) {
+      content: '';
+      position: absolute;
+      top: 3rem;
+      left: -1.95rem;
+      width: 1.35rem;
+      border-top: 1.5px solid var(--td-ink-soft);
+    }
+    .td :global(.td-flow > * + *::after) {
+      content: '';
+      position: absolute;
+      top: calc(3rem - 0.27rem);
+      left: -1.15rem;
+      width: 0.55rem;
+      height: 0.55rem;
+      border-top: 1.5px solid var(--td-ink-soft);
+      border-right: 1.5px solid var(--td-ink-soft);
+      transform: rotate(45deg);
+    }
+  }
+
+  /* ---------- Controls ---------- */
+  .td-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem 1rem;
+    margin-top: 1.75rem;
+  }
+  .td-stepper {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .td-step {
+    padding: 0.2rem 0.3rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: rgba(var(--color-text-base), 0.6);
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--theme-transition), border-color 0.4s ease;
+  }
+  .td-step:hover {
+    color: rgb(var(--color-text-base));
+  }
+  .td-step[aria-current='step'] {
+    color: rgb(var(--color-text-base));
+    font-weight: 700;
+    border-bottom-color: rgb(var(--color-accent));
+  }
+  .td-buttons {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .td-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1.5px solid rgba(var(--color-text-base), 0.35);
+    border-radius: 999px;
+    background: transparent;
+    color: rgb(var(--color-text-base));
+    cursor: pointer;
+    transition: var(--theme-transition);
+  }
+  .td-btn:hover:not([aria-disabled='true']) {
+    background: rgb(var(--color-card));
+  }
+  .td-btn[aria-disabled='true'] {
+    opacity: 0.35;
+    cursor: default;
+  }
+  .td-btn svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .td-live {
+    max-width: 40rem;
+    min-height: 4.8em;
+    margin: 0.9rem auto 0;
+    font-size: 0.95rem;
+    text-align: center;
+  }
+  .td-live-label {
+    font-weight: 700;
+  }
+
+  @media (max-width: 559px) {
+    .td {
+      --td-arrow: 0.8rem;
+    }
+    .td-pipe {
+      font-size: 12px;
+    }
+    .td-node {
+      padding: 0.4rem 0.2rem;
+      border-radius: 0.4rem;
+    }
+    .td-node-detail,
+    .td-loop-label {
+      font-size: 12px;
+    }
+    .td-loop {
+      margin: 0 1rem;
+    }
+    .td :global(.td-card) {
+      padding: 0.8rem 0.8rem 0.9rem;
+    }
+    .td :global(.td-slots) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.05rem;
+    }
+    .td :global(.td-slots dd) {
+      margin-bottom: 0.35rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .td,
+    .td * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+</style>
+
+<script>
+  const STEP_MS = 3200;
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.querySelectorAll<HTMLElement>('[data-td]').forEach((root) => {
+    const views = (root.dataset.views ?? '').split(' ');
+    const dwell = (root.dataset.dwell ?? '').split(' ').map(Number);
+    const last = views.length - 1;
+    const focusables = root.querySelectorAll<HTMLElement>('[data-focus]');
+    const viewEls = root.querySelectorAll<HTMLElement>('.td-view');
+    const staged = root.querySelectorAll<HTMLElement>('[data-show-from]');
+    const stepBtns = root.querySelectorAll<HTMLButtonElement>('[data-goto]');
+    const captions = root.querySelectorAll<HTMLElement>('[data-caption]');
+    const prev = root.querySelector<HTMLButtonElement>('[data-prev]')!;
+    const next = root.querySelector<HTMLButtonElement>('[data-next]')!;
+    const replay = root.querySelector<HTMLButtonElement>('[data-replay]')!;
+
+    let step = last;
+    let timer: number | undefined;
+    let autoplay = false;
+    let inView = false;
+
+    function render(i: number) {
+      step = Math.max(0, Math.min(last, i));
+      const view = views[step];
+      root.dataset.step = String(step);
+      root.dataset.view = view;
+      viewEls.forEach((v) => v.classList.toggle('is-on', (v.dataset.viewOf ?? '').split(' ').includes(view)));
+      staged.forEach((n) => n.classList.toggle('is-hidden', step < Number(n.dataset.showFrom)));
+      focusables.forEach((n) => {
+        const focus = (n.dataset.focus ?? '').split(' ').filter(Boolean).map(Number);
+        n.classList.toggle('is-focus', focus.includes(step));
+      });
+      stepBtns.forEach((b) => {
+        if (Number(b.dataset.goto) === step) b.setAttribute('aria-current', 'step');
+        else b.removeAttribute('aria-current');
+      });
+      captions.forEach((c) => (c.hidden = Number(c.dataset.caption) !== step));
+      prev.setAttribute('aria-disabled', String(step === 0));
+      next.setAttribute('aria-disabled', String(step === last));
+    }
+
+    function stop() {
+      autoplay = false;
+      window.clearTimeout(timer);
+    }
+
+    function tick() {
+      window.clearTimeout(timer);
+      if (!autoplay || !inView) return;
+      if (step >= last) {
+        autoplay = false;
+        return;
+      }
+      timer = window.setTimeout(() => {
+        render(step + 1);
+        tick();
+      }, dwell[step] || STEP_MS);
+    }
+
+    function play() {
+      render(0);
+      if (reduced()) {
+        render(last);
+        return;
+      }
+      autoplay = true;
+      tick();
+    }
+
+    stepBtns.forEach((b) =>
+      b.addEventListener('click', () => {
+        stop();
+        render(Number(b.dataset.goto));
+      }),
+    );
+    prev.addEventListener('click', () => {
+      stop();
+      render(step - 1);
+    });
+    next.addEventListener('click', () => {
+      stop();
+      render(step + 1);
+    });
+    replay.addEventListener('click', play);
+    root.addEventListener('keydown', (e) => {
+      if (!(e.target instanceof HTMLButtonElement)) return;
+      if (e.key === 'ArrowRight') {
+        stop();
+        render(step + 1);
+      } else if (e.key === 'ArrowLeft') {
+        stop();
+        render(step - 1);
+      } else return;
+      e.preventDefault();
+    });
+
+    render(last);
+    if (reduced() || !('IntersectionObserver' in window)) return;
+
+    render(0);
+    let started = false;
+    new IntersectionObserver(
+      (entries) => {
+        inView = entries.some((e) => e.isIntersecting);
+        if (inView && !started) {
+          started = true;
+          autoplay = true;
+        }
+        tick();
+      },
+      { threshold: 0.2 },
+    ).observe(root);
+  });
+</script>

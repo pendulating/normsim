@@ -1,0 +1,32 @@
+{
+  "myth-of-sisyphus_camus": {
+    "cover": 0.6483,
+    "spine": 0.056,
+    "palette": {
+      "bg": "#000014",
+      "ink": "#faf8f2",
+      "accent": "#faf8f2",
+      "accentReadable": false
+    }
+  },
+  "possible-worlds_ryan": {
+    "cover": 0.6287,
+    "spine": null,
+    "palette": {
+      "bg": "#254187",
+      "ink": "#faf8f2",
+      "accent": "#e83644",
+      "accentReadable": false
+    }
+  },
+  "privacy-in-context_nissenbaum": {
+    "cover": 0.6734,
+    "spine": 0.0708,
+    "palette": {
+      "bg": "#fffeff",
+      "ink": "#18181c",
+      "accent": "#aa0007",
+      "accentReadable": true
+    }
+  }
+}

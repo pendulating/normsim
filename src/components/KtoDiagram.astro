@@ -1,0 +1,402 @@
+---
+/* Phase 2b, offline KTO, as a six-step diagram on the shared StepDiagram
+   shell: why a second arm, sampling and labeling against the normative
+   universe, one real corrected pair, the assembled set, and the update. */
+import StepDiagram from './StepDiagram.astro';
+import TrainingCurve from './TrainingCurve.astro';
+import { kto } from '../data/training';
+
+const s = kto.set;
+const p = kto.pair;
+const fmt = (n: number) => n.toLocaleString('en-US');
+const weighted = (s.lambdaD * s.desirable) / (s.lambdaU * s.undesirable);
+const kc = kto.curve;
+const kd = kc.desirable[kc.desirable.length - 1][1];
+const ku = kc.undesirable[kc.undesirable.length - 1][1];
+const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v).toFixed(2)}`;
+---
+
+<StepDiagram name={kto.name} pipeline={kto.pipeline} steps={kto.steps}>
+  <!-- 1. Why a second arm: a group with no spread gives GRPO nothing. -->
+  <div class="td-view" data-view-of="why">
+    <div class="td-flow">
+      <section class="td-card" aria-label="GRPO on a chunk the policy always gets wrong">
+        <header class="td-head-row">
+          <h4 class="td-title">GRPO</h4>
+          <span class="td-meta">relative to its own group</span>
+        </header>
+        <div class="kt-dots" role="img" aria-label="Eight samples, all wrong, all with equal reward">
+          {Array.from({ length: 8 }, () => <span class="kt-dot kt-dot-bad">✕</span>)}
+        </div>
+        <p class="kt-line">all 8 samples mislabel the violation → equal rewards → every advantage is <b>0</b></p>
+        <p class="td-note">No spread, no gradient. GRPO can sharpen what the policy sometimes does, not what it never samples.</p>
+      </section>
+      <section class="td-card" aria-label="KTO scores each completion against an absolute label">
+        <header class="td-head-row">
+          <h4 class="td-title">KTO</h4>
+          <span class="td-meta">against an absolute label</span>
+        </header>
+        <div class="kt-dots" role="img" aria-label="The same wrong sample, paired with a corrected copy">
+          <span class="kt-dot kt-dot-bad">✕</span>
+          <span class="kt-arrow">→</span>
+          <span class="kt-dot kt-dot-good">✓</span>
+        </div>
+        <p class="kt-line">a wrong sample is labeled <b>undesirable</b>; its corrected copy is <b>desirable</b></p>
+        <p class="td-note">
+          The label is computed offline from the novel’s norms, so the arm needs no correct sample from the policy to learn
+          from.
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 2-3. Sampling, then the desirability predicate. -->
+  <div class="td-view" data-view-of="label">
+    <div class="td-card kt-label">
+      <header class="td-head-row">
+        <h4 class="td-title">Sampled completions</h4>
+        <span class="td-meta">merged SFT policy, T = 1.0, one vLLM pass</span>
+      </header>
+      <div class="kt-grid" aria-hidden="true">
+        {
+          Array.from({ length: 64 }, (_, i) => (
+            <span class="kt-cell" data-kind={kto.gridKinds[i % kto.gridKinds.length]} />
+          ))
+        }
+      </div>
+      <ul class="kt-rules" data-show-from="2">
+        <li>
+          <span class="kt-key" data-kind="d"></span><b>desirable</b> every matched violation labeled correctly, and at least
+          half of all matched flows
+        </li>
+        <li>
+          <span class="kt-key" data-kind="u"></span><b>undesirable</b> at least one matched violation mislabeled
+        </li>
+        <li>
+          <span class="kt-key" data-kind="x"></span><b>excluded</b> invalid output, or no flow matched to a teacher flow
+        </li>
+      </ul>
+      <p class="td-note" data-show-from="2">
+        On chunks whose flows are all appropriate, desirable requires every matched flow correct: a specificity check
+        against flagging everything. Matching, threshold, and norm retrieval are R<sub>direct</sub>’s, verbatim. The grid is
+        schematic.
+      </p>
+    </div>
+  </div>
+
+  <!-- 4. One real corrected pair. -->
+  <div class="td-view" data-view-of="pair">
+    <p class="kt-head">
+      One real pair · <span class="kt-book">{p.book}</span>, chunk {p.chunkId} · flow {p.flowIndex + 1} of {p.flowsTotal},
+      verbatim · reasoning and other flows identical
+    </p>
+    <div class="td-flow">
+      <section class="td-card" aria-label="Undesirable: the original completion">
+        <header class="td-head-row">
+          <h4 class="td-title">Undesirable</h4>
+          <span class="td-meta">the policy’s own sample</span>
+        </header>
+        <pre class="td-code td-inset">{p.before.pre}<mark class="td-mark kt-wrong">{p.before.label}</mark>{p.before.post}</pre>
+      </section>
+      <section class="td-card" aria-label="Desirable: the corrected copy">
+        <header class="td-head-row">
+          <h4 class="td-title">Desirable</h4>
+          <span class="td-meta">only the judgment edited</span>
+        </header>
+        <pre class="td-code td-inset">{p.before.pre}<mark class="td-mark">{p.after.label}</mark>{p.before.post}</pre>
+        {
+          p.norm && (
+            <p class="td-note">
+              Reference from the nearest norm: “{p.norm.text}” ({`${p.norm.force} × ${p.norm.polarity}`}) →{' '}
+              <b>{p.after.label}</b>
+            </p>
+          )
+        }
+      </section>
+    </div>
+  </div>
+
+  <!-- 5. The assembled set. -->
+  <div class="td-view" data-view-of="set">
+    <div class="td-card kt-set">
+      <header class="td-head-row">
+        <h4 class="td-title">{fmt(s.rows)} rows</h4>
+        <span class="td-meta">one frozen set, built once</span>
+      </header>
+      <div class="kt-split" role="img" aria-label={`${fmt(s.desirable)} desirable, ${fmt(s.undesirable)} undesirable`}>
+        <span class="kt-split-d" style={`--n:${s.desirable}`}>{fmt(s.desirable)} desirable</span>
+        <span class="kt-split-u" style={`--n:${s.undesirable}`}>{fmt(s.undesirable)} undesirable</span>
+      </div>
+      <ul class="kt-types">
+        {
+          kto.rowTypes.map((t) => (
+            <li>
+              <span class="kt-key" data-kind={t.kind} />
+              {t.label}
+              {t.n != null && <b> {fmt(t.n)}</b>}
+            </li>
+          ))
+        }
+      </ul>
+      <p class="kt-ratio">
+        λ<sub>D</sub> n<sub>D</sub> / λ<sub>U</sub> n<sub>U</sub> = {s.lambdaD} · {fmt(s.desirable)} / {fmt(s.undesirable)} =
+        <b>{weighted.toFixed(2)}</b>, inside the recommended [1, 1.5]
+      </p>
+    </div>
+  </div>
+
+  <!-- 6. The update. -->
+  <div class="td-view is-on" data-view-of="loss">
+    <div class="td-card kt-loss">
+      <svg class="kt-fig" viewBox="0 0 360 150" role="img" aria-label="KTO value: desirable completions are pushed above the reference point, undesirable ones below">
+        <line class="kt-axis" x1="20" y1="75" x2="340" y2="75" />
+        <text x="344" y="79" class="kt-ref">ref</text>
+        <path class="kt-curve" d="M20 140 C120 140 150 75 180 75 C210 75 240 12 340 12" />
+        <circle class="kt-pt kt-pt-d" cx="262" cy="22" r="6" />
+        <circle class="kt-pt kt-pt-u" cx="98" cy="128" r="6" />
+        <text x="276" y="46" class="kt-pt-label" text-anchor="start">desirable ↑</text>
+        <text x="86" y="112" class="kt-pt-label" text-anchor="end">undesirable ↓</text>
+        <text x="180" y="146" class="kt-axis-label">log π / π<tspan baseline-shift="sub" font-size="9">SFT</tspan> − KL</text>
+      </svg>
+      <div>
+        <p>
+          Each row is scored on its own, as a gain or a loss relative to the SFT reference. KTO raises the implied reward of
+          desirable rows and lowers it for undesirable ones, with a prospect-theory value curve that saturates either way.
+        </p>
+        <p class="td-pills">
+          {kto.hyper.map((h) => <span class="td-pill">{h}</span>)}
+        </p>
+        <p class="td-note">
+          Shares the GRPO arm’s merged SFT checkpoint, not its policy. A supervised control trained on the desirable rows
+          alone isolates what the undesirable half adds.
+        </p>
+      </div>
+    </div>
+    <div class="td-card kt-trend">
+      <header class="td-head-row">
+        <h4 class="td-title">Desirable and undesirable rows separate</h4>
+        <span class="td-meta">implied reward, verdict arm, {kc.steps} optimizer steps</span>
+      </header>
+      <TrainingCurve
+        label={`KTO implied reward over ${kc.steps} steps: desirable rows rise to ${signed(kd)}, undesirable rows fall to ${signed(ku)}`}
+        series={[
+          { name: 'desirable', points: kc.desirable, tone: 'accent', end: ['desirable', signed(kd)] },
+          { name: 'undesirable', points: kc.undesirable, tone: 'ink', end: ['undesirable', signed(ku)] },
+        ]}
+        legend={[
+          { tone: 'accent', label: 'desirable rows' },
+          { tone: 'ink', label: 'undesirable rows' },
+        ]}
+        x={{ max: kc.steps, ticks: [0, 200, 400, 600], label: 'step' }}
+        y={{ min: -2.4, max: 2.4, ticks: [-2, -1, 0, 1, 2] }}
+        ref={0}
+        yName="implied reward"
+        table={{
+          head: ['Step', 'Desirable', 'Undesirable'],
+          rows: kc.desirable.map(([a, b], i) => [a, b.toFixed(2), kc.undesirable[i][1].toFixed(2)]),
+        }}
+      >
+        <p class="td-note">
+          β · log π / π<sub>SFT</sub> averaged over each batch’s rows, logged every 10 optimizer steps of the single epoch.
+          Both start at zero, on the reference.
+        </p>
+      </TrainingCurve>
+    </div>
+  </div>
+</StepDiagram>
+
+<style>
+  .kt-head {
+    margin: 0 0 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    opacity: 0.8;
+  }
+  .kt-book {
+    font-weight: 700;
+    font-style: italic;
+  }
+
+  /* Why. */
+  .kt-dots {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0.2rem 0 0.6rem;
+  }
+  .kt-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .kt-dot-bad {
+    border: 1.5px solid var(--td-ink-soft);
+    color: rgba(var(--color-text-base), 0.7);
+  }
+  .kt-dot-good {
+    border: 1.5px solid rgb(var(--color-accent));
+    color: rgb(var(--color-accent));
+  }
+  .kt-arrow {
+    opacity: 0.6;
+  }
+  .kt-line {
+    margin: 0;
+  }
+
+  /* Label. */
+  .kt-label,
+  .kt-set,
+  .kt-loss {
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+  .kt-grid {
+    display: grid;
+    grid-template-columns: repeat(16, minmax(0, 1fr));
+    gap: 4px;
+    max-width: 30rem;
+  }
+  .kt-cell {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: rgba(var(--color-text-base), 0.18);
+    transition: background-color 0.5s ease;
+  }
+  :global(.td[data-step='2']) .kt-cell[data-kind='d'],
+  .kt-key[data-kind='d'] {
+    background: rgb(var(--color-accent));
+  }
+  :global(.td[data-step='2']) .kt-cell[data-kind='u'],
+  .kt-key[data-kind='u'] {
+    background: rgba(var(--color-text-base), 0.6);
+  }
+  :global(.td[data-step='2']) .kt-cell[data-kind='x'],
+  .kt-key[data-kind='x'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--td-ink-faint);
+  }
+  .kt-key[data-kind='c'] {
+    background: rgba(var(--color-accent), 0.45);
+  }
+  .kt-key[data-kind='a'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px rgb(var(--color-accent));
+  }
+  .kt-key[data-kind='h'] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--td-ink-soft);
+  }
+  .kt-rules,
+  .kt-types {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+  }
+  .kt-key {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-right: 0.45rem;
+    border-radius: 2px;
+    vertical-align: -0.05rem;
+  }
+
+  /* Pair. */
+  .kt-wrong {
+    background: rgba(var(--color-text-base), 0.1);
+    border-bottom-color: var(--td-ink-soft);
+  }
+
+  /* Set. */
+  .kt-split {
+    display: flex;
+    overflow: hidden;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .kt-split > span {
+    flex: var(--n) 0 0;
+    padding: 0.3rem 0.6rem;
+    white-space: nowrap;
+  }
+  .kt-split-d {
+    background: rgb(var(--color-accent));
+    color: rgb(var(--color-fill));
+  }
+  .kt-split-u {
+    background: rgba(var(--color-text-base), 0.6);
+    color: rgb(var(--color-fill));
+  }
+  .kt-ratio {
+    margin: 0.9rem 0 0;
+    font-size: 0.875rem;
+  }
+
+  /* Loss. */
+  .kt-loss {
+    display: grid;
+    gap: 1rem 2rem;
+    align-items: center;
+  }
+  @media (min-width: 720px) {
+    .kt-loss {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+  .kt-loss p {
+    margin: 0 0 0.5rem;
+  }
+  .kt-fig {
+    width: 100%;
+    max-width: 24rem;
+    height: auto;
+    margin: 0 auto;
+    overflow: visible;
+  }
+  .kt-axis {
+    stroke: var(--td-ink-soft);
+    stroke-width: 1.25;
+    stroke-dasharray: 4 3;
+  }
+  .kt-curve {
+    fill: none;
+    stroke: rgb(var(--color-text-base));
+    stroke-width: 2;
+  }
+  .kt-pt-d {
+    fill: rgb(var(--color-accent));
+  }
+  .kt-pt-u {
+    fill: rgba(var(--color-text-base), 0.6);
+  }
+  .kt-fig text {
+    fill: rgb(var(--color-text-base));
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .kt-axis-label {
+    text-anchor: middle;
+  }
+  .kt-ref {
+    opacity: 0.7;
+  }
+  .kt-axis-label {
+    opacity: 0.7;
+  }
+  .kt-trend {
+    max-width: 30rem;
+    margin: 1rem auto 0;
+  }
+</style>

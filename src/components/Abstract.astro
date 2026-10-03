@@ -1,0 +1,8 @@
+---
+import Section from './Section.astro';
+import { paper } from '../data/paper';
+---
+
+<Section id="abstract" title="Abstract">
+  {paper.abstract.map((p) => <p class="mb-4 last:mb-0">{p}</p>)}
+</Section>

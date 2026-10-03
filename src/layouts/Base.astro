@@ -1,0 +1,58 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { paper } from '../data/paper';
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const { title = paper.shortTitle, description = paper.description } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={paper.title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#FBFEFB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#212737" media="(prefers-color-scheme: dark)" />
+
+    <!-- Apply the stored theme before first paint so there is no flash. -->
+    <script is:inline>
+      (function () {
+        var t = null;
+        try {
+          t = localStorage.getItem('theme');
+        } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          t =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t);
+      })();
+    </script>
+
+    <link rel="stylesheet" href="https://use.typekit.net/krx4hav.css" />
+  </head>
+  <body>
+    <a
+      class="skip-link absolute -top-full left-4 z-[100] bg-skin-accent px-3 py-2 font-bold text-skin-on-ink no-underline focus:top-2"
+      href="#main">Skip to content</a
+    >
+    <Header />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer />
+  </body>
+</html>

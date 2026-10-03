@@ -1,0 +1,161 @@
+@import './tokens.css';
+@import 'tailwindcss';
+
+/* The theme switch is an attribute on <html>, not a media query. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* The palette is exposed to components only through the `skin` namespace:
+   bg-skin-fill, text-skin-base, text-skin-accent, border-skin-line, and so on.
+   Components never name a raw token. Wrapping the triplet in rgb() keeps the
+   alpha modifier working (bg-skin-accent/70), which is a requirement of the
+   port, not a nicety. */
+@theme inline {
+  --color-skin-fill: rgb(var(--color-fill));
+  --color-skin-base: rgb(var(--color-text-base));
+  --color-skin-accent: rgb(var(--color-accent));
+  --color-skin-card: rgb(var(--color-card));
+  --color-skin-card-muted: rgb(var(--color-card-muted));
+  --color-skin-line: rgb(var(--color-border));
+  /* Page-background color used as text, for fill-colored text on an accent or
+     ink ground (skip link, selection). */
+  --color-skin-on-ink: rgb(var(--color-fill));
+
+  /* One typeface family. `mono` is deliberately an alias of the text cut, as in
+     the reference site; genuine monospace is hand-written where wanted. */
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    scroll-padding-top: calc(var(--header-height) + 1rem);
+  }
+
+  body {
+    @apply bg-skin-fill text-skin-base font-sans font-normal text-[1.0625rem] leading-relaxed;
+    @apply selection:bg-skin-accent/70 selection:text-skin-on-ink;
+    transition: var(--theme-transition);
+  }
+
+  /* Typography: one family, four roles. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .site-logo {
+    @apply font-display font-bold leading-tight;
+  }
+
+  strong,
+  b,
+  nav a,
+  .project-button,
+  .project-tag {
+    @apply font-bold;
+  }
+
+  /* Captions get more weight, not less; that is what keeps metadata legible
+     against the low-contrast light border and card colors. */
+  small,
+  figcaption,
+  time,
+  .project-venue,
+  .caption {
+    @apply font-sans font-medium text-sm;
+  }
+
+  a {
+    @apply underline decoration-skin-accent/55 decoration-[1.5px] underline-offset-[0.16em];
+    @apply outline-2 outline-offset-1 outline-transparent;
+    @apply focus-visible:no-underline focus-visible:outline-dashed focus-visible:outline-skin-accent;
+    transition: var(--theme-transition), text-decoration-color 0.2s ease;
+  }
+
+  a:hover {
+    @apply decoration-skin-accent;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    box-shadow: 0 0 0 2px rgba(var(--color-accent), 0.35);
+  }
+
+  button:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-2 outline-offset-1 outline-dashed outline-skin-accent;
+  }
+
+  section,
+  svg {
+    transition: var(--theme-transition);
+  }
+
+  svg {
+    fill: currentColor;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    body,
+    section,
+    a,
+    svg,
+    .themed {
+      transition: none;
+    }
+  }
+}
+
+@layer components {
+  .wrap {
+    @apply w-full max-w-[46rem] mx-auto px-4;
+  }
+
+  .wrap-wide {
+    @apply w-full max-w-5xl mx-auto px-4;
+  }
+
+  /* Anything that changes with the theme takes the shared transition. */
+  .themed {
+    transition: var(--theme-transition);
+  }
+
+  .project-button {
+    @apply inline-flex items-center gap-2 rounded-md border-[1.5px] border-skin-base bg-transparent px-4 py-2.5 text-[0.95rem] text-skin-base no-underline cursor-pointer;
+    @apply hover:bg-skin-card hover:no-underline;
+    transition: var(--theme-transition);
+  }
+
+  .project-button svg {
+    @apply size-[1.05em];
+  }
+
+  .project-venue {
+    @apply inline-block rounded-full border border-skin-base/35 px-2.5 py-0.5;
+  }
+
+  .card {
+    @apply rounded-lg border border-skin-line bg-skin-card;
+    transition: var(--theme-transition);
+  }
+
+  /* Thin accent gradient rule: one of the few sanctioned uses of accent. */
+  .rule {
+    @apply h-0.5 border-0 m-0;
+    background: linear-gradient(90deg, rgba(var(--color-accent), 0.55), rgba(var(--color-accent), 0));
+  }
+
+  /* Genuine monospace, hand-written rather than routed through font-mono. */
+  .code-block {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+    @apply text-[0.875rem] leading-normal;
+  }
+}

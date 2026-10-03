@@ -1,0 +1,1122 @@
+---
+/* Further reading as a shelf of scanned books and a stack of papers, in one 3D
+   scene under one perspective.
+
+   Books view (front). Each book is a small 3D box: spine, front cover, page
+   block, and top. Closed, the box is turned so its spine faces the reader and
+   its slot on the shelf is a spine's width. Hovering or focusing lifts the
+   book and names it. Clicking turns the box a quarter turn to show the cover
+   while the slot widens to a cover's width, so the neighbouring spines slide
+   aside; in step with the turn, a panel under the shelf gives the reading's
+   link, why it matters, and its quote. One book is open at a time; Escape, the
+   close button, or a second click shelves it again. Arrow keys move between
+   spines.
+
+   Papers view (top down). The papers lie in a stack beside the books, seen
+   edge-on from the front. Choosing "Papers" (or clicking the stack) swings the
+   whole scene a quarter turn about the shelf's front edge, as if the camera
+   rose above the shelf, so the top paper's first page faces the reader. The
+   books stay on the shelf but cannot be picked. Up/down arrows lying beside
+   the stack file through the papers, moving the top page off the stack or
+   bringing the last one back; clicking the page opens the paper in a new tab.
+
+   Without JS the panels and a list of the papers show under the shelf.
+   Reduced motion swaps every view without animating. Images are web copies
+   made by scripts/books.mjs; their aspect ratios and cover palettes come from
+   bookAssets.json and paperAssets.json. A book with no spine scan gets a drawn
+   spine: the cover's dominant color, accent bands, and the title and author's
+   surname set top to bottom, sized at build time to fit on one or two lines. */
+import { readingGroups, type Reading } from '../data/readings';
+import assets from '../data/bookAssets.json';
+import paperAssets from '../data/paperAssets.json';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const src = (slug: string, part: 'spine' | 'cover', tag: '1x' | '2x') =>
+  `${base}/assets/books/web/${slug}-${part}-${tag}.webp`;
+const srcset = (slug: string, part: 'spine' | 'cover') =>
+  `${src(slug, part, '1x')} 1x, ${src(slug, part, '2x')} 2x`;
+const pageSrc = (slug: string, tag: '1x' | '2x') => `${base}/assets/papers/web/${slug}-${tag}.webp`;
+
+interface Asset {
+  cover: number;
+  spine: number | null;
+  palette: { bg: string; ink: string; accent: string; accentReadable: boolean };
+}
+
+/** Text sizes for a drawn spine, as fractions of the book's height. The title gets ~68% of the
+    spine's length; it takes two lines when that sets it larger. Character width ≈ 0.58em. */
+function spineType(title: string, author: string, sa: number) {
+  const len = 0.68;
+  const one = Math.min(sa * 0.5, len / (title.length * 0.58));
+  const two = Math.min(sa * 0.34, len / ((title.length / 2 + 2) * 0.58));
+  const surname = author.split(' ').pop()!.toUpperCase();
+  return {
+    title: Math.max(one, two),
+    lines: two > one ? 2 : 1,
+    surname,
+    author: Math.min(sa * 0.4, 0.17 / (surname.length * 0.68)),
+  };
+}
+
+const items = readingGroups.flatMap((g) => g.items);
+const books = items
+  .filter((r): r is Reading & { book: NonNullable<Reading['book']> } => !!r.book)
+  .map((r, i) => {
+    const a = (assets as Record<string, Asset>)[r.book.slug];
+    const [main, ...rest] = r.title.split(':');
+    const sa = a.spine ?? r.book.thickness ?? 0.075;
+    const drawn = a.spine == null ? spineType(r.book.spineTitle ?? main.trim(), r.book.author, sa) : null;
+    return { ...r, a, sa, drawn, main: main.trim(), sub: rest.join(':').trim(), id: `book-${i}` };
+  });
+const papers = items
+  .filter((r): r is Reading & { paper: NonNullable<Reading['paper']> } => !!r.paper)
+  .map((r) => ({ ...r, aspect: (paperAssets as Record<string, { page: number }>)[r.paper.slug].page }));
+/** The stack takes the first paper's page shape; every sheet is cropped to it. */
+const pageAspect = papers[0]?.aspect ?? 0.773;
+---
+
+<div class="shelf" data-shelf data-mode="books" style={`--pa:${pageAspect}; --pn:${papers.length}`}>
+  <div class="shelf-stage">
+    <div class="shelf-world">
+      <div class="shelf-surface" aria-hidden="true"></div>
+      <div class="shelf-edge" aria-hidden="true"></div>
+      <ul class="shelf-books" aria-label="Bookshelf">
+        {
+          books.map((b) => (
+            <li class="book" style={`--sa:${b.sa}; --ca:${b.a.cover}; --edge:${b.a.palette.bg}`} data-book={b.id}>
+              <button
+                type="button"
+                class="book-btn"
+                aria-expanded="false"
+                aria-controls={`${b.id}-panel`}
+                aria-label={`${b.main}, by ${b.book.author}`}
+              >
+                <span class="book-3d">
+                  {b.drawn ? (
+                    <span
+                      class="book-face book-spine book-spine-drawn"
+                      style={`--bg:${b.a.palette.bg}; --ink:${b.a.palette.ink}; --accent:${b.a.palette.accent}; --kt:${b.drawn.title}; --ka:${b.drawn.author}`}
+                      data-lines={b.drawn.lines}
+                    >
+                      <span class="spine-title">{b.book.spineTitle ?? b.main}</span>
+                      <span class="spine-author" data-accent={b.a.palette.accentReadable ? '' : undefined}>
+                        {b.drawn.surname}
+                      </span>
+                    </span>
+                  ) : (
+                    <span class="book-face book-spine">
+                      <img srcset={srcset(b.book.slug, 'spine')} src={src(b.book.slug, 'spine', '1x')} alt="" decoding="async" />
+                    </span>
+                  )}
+                  <span class="book-face book-cover">
+                    <img srcset={srcset(b.book.slug, 'cover')} src={src(b.book.slug, 'cover', '1x')} alt="" loading="lazy" decoding="async" />
+                  </span>
+                  <span class="book-face book-pages" />
+                  <span class="book-face book-top" />
+                </span>
+              </button>
+              <span class="book-tip" aria-hidden="true">
+                <b>{b.main}</b>
+                <span>{b.book.author}</span>
+              </span>
+            </li>
+          ))
+        }
+        {
+          papers.length > 0 && (
+            <li class="stack" aria-label="Papers">
+              <button type="button" class="stack-open" aria-label={`Look at the papers (${papers.length})`} />
+              <span class="stack-tip" aria-hidden="true">
+                <b>Papers</b>
+                <span>{papers.length === 1 ? '1 on the stack' : `${papers.length} on the stack`}</span>
+              </span>
+              <div class="stack-top">
+                {papers.map((p, i) => (
+                  <a
+                    class="sheet"
+                    href={p.href}
+                    target="_blank"
+                    rel="noopener"
+                    data-sheet={i}
+                    tabindex="-1"
+                    aria-label={`Open ${p.title} (new tab)`}
+                  >
+                    <img
+                      srcset={`${pageSrc(p.paper.slug, '1x')} 1x, ${pageSrc(p.paper.slug, '2x')} 2x`}
+                      src={pageSrc(p.paper.slug, '1x')}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </a>
+                ))}
+              </div>
+              <div class="stack-ctrl">
+                <button type="button" class="stack-arrow" data-file="-1" aria-label="Previous paper" tabindex="-1">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 15l6-6 6 6" />
+                  </svg>
+                </button>
+                <span class="stack-count" aria-hidden="true">
+                  <b data-count>1</b>
+                  <span>/ {papers.length}</span>
+                </span>
+                <button type="button" class="stack-arrow" data-file="1" aria-label="Next paper" tabindex="-1">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              </div>
+            </li>
+          )
+        }
+      </ul>
+    </div>
+  </div>
+
+  {
+    papers.length > 0 && (
+      <div class="shelf-modes" role="group" aria-label="Shelf view">
+        <button type="button" class="shelf-mode" data-mode-btn="books" aria-pressed="true">
+          Books
+        </button>
+        <button type="button" class="shelf-mode" data-mode-btn="papers" aria-pressed="false">
+          Papers
+        </button>
+      </div>
+    )
+  }
+
+  <div class="shelf-panels">
+    {
+      books.map((b) => (
+        <section class="shelf-panel" id={`${b.id}-panel`} data-panel-of={b.id} aria-label={b.main}>
+          <button type="button" class="shelf-close" aria-label="Put the book back">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+          <h3 class="shelf-title">
+            {b.main}
+            {b.sub && <small>{b.sub}</small>}
+          </h3>
+          <p class="shelf-meta">{b.meta}</p>
+          {b.why && <p class="shelf-why">{b.why}</p>}
+          {b.quote && (
+            <blockquote class="shelf-quote">
+              <p>{b.quote.text}</p>
+              {b.quote.source && (
+                <footer>{b.quote.href ? <a href={b.quote.href}>{b.quote.source}</a> : b.quote.source}</footer>
+              )}
+            </blockquote>
+          )}
+          {b.href && (
+            <a class="shelf-link" href={b.href} target="_blank" rel="noopener">
+              Read the book
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 17L17 7M9 7h8v8" />
+              </svg>
+            </a>
+          )}
+        </section>
+      ))
+    }
+  </div>
+
+  {
+    papers.length > 0 && (
+      <div class="paper-captions" aria-live="polite">
+        {papers.map((p, i) => (
+          <p class="paper-caption" data-caption={i}>
+            <a href={p.href} target="_blank" rel="noopener">
+              {p.title}
+            </a>
+            <span>{p.meta}</span>
+          </p>
+        ))}
+      </div>
+    )
+  }
+</div>
+
+<script>
+  const TURN_MS = 650;
+  const FILE_MS = 380;
+  const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.querySelectorAll<HTMLElement>('[data-shelf]').forEach((shelf) => {
+    shelf.classList.add('is-js');
+    const shelfBooks = shelf.querySelector<HTMLElement>('.shelf-books')!;
+    const books = [...shelf.querySelectorAll<HTMLElement>('.book')];
+    const buttons = books.map((b) => b.querySelector<HTMLButtonElement>('.book-btn')!);
+    const panelOf = (id: string) => shelf.querySelector<HTMLElement>(`[data-panel-of="${id}"]`)!;
+    let open: HTMLElement | null = null;
+    let track = 0;
+
+    /* ---------- Books ---------- */
+
+    /** Point the panel's caret at the open book. */
+    const aim = () => {
+      if (!open) return;
+      const panel = panelOf(open.dataset.book!);
+      const p = panel.getBoundingClientRect();
+      const b = open.getBoundingClientRect();
+      const x = Math.min(Math.max(b.left + b.width / 2 - p.left, 24), p.width - 24);
+      panel.style.setProperty('--caret', `${x}px`);
+    };
+
+    const close = () => {
+      if (!open) return;
+      const was = open;
+      was.classList.remove('is-open');
+      was.querySelector('.book-btn')!.setAttribute('aria-expanded', 'false');
+      panelOf(was.dataset.book!).classList.remove('is-on');
+      shelf.classList.remove('has-open');
+      window.cancelAnimationFrame(track);
+      open = null;
+    };
+
+    const show = (book: HTMLElement) => {
+      close();
+      open = book;
+      book.classList.add('is-open');
+      book.querySelector('.book-btn')!.setAttribute('aria-expanded', 'true');
+      shelf.classList.add('has-open');
+      // The panel opens with the turn; its caret follows the book while the slot widens.
+      aim();
+      panelOf(book.dataset.book!).classList.add('is-on');
+      const until = performance.now() + (reduced() ? 0 : TURN_MS);
+      const follow = () => {
+        aim();
+        if (open === book && performance.now() < until) track = window.requestAnimationFrame(follow);
+      };
+      track = window.requestAnimationFrame(follow);
+    };
+
+    buttons.forEach((btn, i) => {
+      const book = books[i];
+      btn.addEventListener('click', () => (open === book ? close() : show(book)));
+      btn.addEventListener('keydown', (e) => {
+        const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+        if (!step) return;
+        e.preventDefault();
+        buttons[(i + step + buttons.length) % buttons.length].focus();
+      });
+    });
+    shelf.querySelectorAll<HTMLButtonElement>('.shelf-close').forEach((b) =>
+      b.addEventListener('click', () => {
+        const was = open;
+        close();
+        was?.querySelector<HTMLButtonElement>('.book-btn')?.focus();
+      }),
+    );
+    shelf.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || !open) return;
+      const was = open;
+      close();
+      was.querySelector<HTMLButtonElement>('.book-btn')!.focus();
+    });
+    window.addEventListener('resize', aim);
+
+    /* ---------- Papers ---------- */
+
+    const stack = shelf.querySelector<HTMLElement>('.stack');
+    if (!stack) return;
+    const sheets = [...stack.querySelectorAll<HTMLAnchorElement>('.sheet')];
+    const arrows = [...stack.querySelectorAll<HTMLButtonElement>('.stack-arrow')];
+    const count = stack.querySelector<HTMLElement>('[data-count]')!;
+    const captions = [...shelf.querySelectorAll<HTMLElement>('[data-caption]')];
+    const modeBtns = [...shelf.querySelectorAll<HTMLButtonElement>('[data-mode-btn]')];
+    const n = sheets.length;
+    let mode: 'books' | 'papers' = 'books';
+    let cur = 0;
+    let filing = false;
+
+    /** Order the sheets so `cur` is on top; only the top sheet is a live link. */
+    const render = () => {
+      sheets.forEach((s, i) => {
+        const pos = (i - cur + n) % n;
+        s.style.setProperty('--pos', String(pos));
+        s.classList.toggle('is-top', pos === 0);
+        s.tabIndex = mode === 'papers' && pos === 0 ? 0 : -1;
+        s.setAttribute('aria-hidden', String(pos !== 0));
+      });
+      captions.forEach((c, i) => c.classList.toggle('is-on', i === cur));
+      count.textContent = String(cur + 1);
+      arrows.forEach((a) => (a.disabled = n < 2));
+    };
+
+    /** Horizontal offset that centres the stack once any open book has closed. */
+    const centre = () => {
+      let x = stack.offsetLeft + stack.offsetWidth / 2;
+      if (open) {
+        const closed = open.offsetHeight * parseFloat(getComputedStyle(open).getPropertyValue('--sa'));
+        x -= (open.offsetWidth - closed) / 2;
+      }
+      shelf.style.setProperty('--tx', `${shelfBooks.offsetWidth / 2 - x}px`);
+    };
+
+    const setMode = (m: 'books' | 'papers') => {
+      if (m === mode) return;
+      if (m === 'papers') centre();
+      close();
+      mode = m;
+      shelf.dataset.mode = m;
+      modeBtns.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.modeBtn === m)));
+      books.forEach((b) => (b.inert = m === 'papers'));
+      stack.querySelector<HTMLButtonElement>('.stack-open')!.tabIndex = m === 'papers' ? -1 : 0;
+      arrows.forEach((a) => (a.tabIndex = m === 'papers' ? 0 : -1));
+      render();
+    };
+
+    /** Move the top page off the stack (dir 1) or bring the last one back (dir -1). */
+    const file = (dir: number) => {
+      if (n < 2 || filing || mode !== 'papers') return;
+      if (reduced()) {
+        cur = (cur + dir + n) % n;
+        render();
+        return;
+      }
+      filing = true;
+      if (dir > 0) {
+        const out = sheets[cur];
+        out.classList.add('is-leaving');
+        window.setTimeout(() => {
+          out.classList.add('no-anim');
+          out.classList.remove('is-leaving');
+          cur = (cur + 1) % n;
+          render();
+          void out.offsetWidth;
+          out.classList.remove('no-anim');
+          filing = false;
+        }, FILE_MS);
+      } else {
+        cur = (cur - 1 + n) % n;
+        const back = sheets[cur];
+        back.classList.add('no-anim', 'is-leaving');
+        render();
+        void back.offsetWidth;
+        back.classList.remove('no-anim', 'is-leaving');
+        window.setTimeout(() => (filing = false), FILE_MS);
+      }
+    };
+
+    modeBtns.forEach((b) => b.addEventListener('click', () => setMode(b.dataset.modeBtn as 'books' | 'papers')));
+    stack.querySelector('.stack-open')!.addEventListener('click', () => setMode('papers'));
+    arrows.forEach((a) => a.addEventListener('click', () => file(Number(a.dataset.file))));
+    stack.addEventListener('keydown', (e) => {
+      if (mode !== 'papers') return;
+      const dir = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      file(dir);
+    });
+    window.addEventListener('resize', () => mode === 'papers' && centre());
+    render();
+  });
+</script>
+
+<style>
+  .shelf {
+    /* Book height, paper width, and the paper stack's depth and thickness. */
+    --h: clamp(13rem, 11rem + 12vw, 19rem);
+    --pw: clamp(10.5rem, 6rem + 14vw, 17rem);
+    --pd: calc(var(--pw) / var(--pa));
+    --pt: calc(var(--pn) * 3px + 4px);
+    /* Stage height: room for the books and their hover labels from the front;
+       room for the top page, slightly enlarged, from above. */
+    --stage: calc(var(--h) + 6.5rem);
+    --stage-top: calc(var(--pd) * 1.08 + 3.5rem);
+    --turn: 0.65s cubic-bezier(0.3, 0.7, 0.2, 1);
+    --swing: 1.05s cubic-bezier(0.55, 0, 0.2, 1);
+    --ink-faint: rgba(var(--color-text-base), 0.14);
+    margin-top: 1.5rem;
+  }
+
+  /* ---------- The scene ---------- */
+
+  /* One perspective for everything on the shelf. The world's floor line is
+     the shelf's front edge; the papers view swings the world a quarter turn
+     about the middle of the paper stack's depth, so the top page lands
+     centred and facing the reader. */
+  .shelf-stage {
+    position: relative;
+    height: var(--stage);
+    overflow-x: clip;
+    perspective: 2600px;
+    perspective-origin: 50% 32%;
+    transition:
+      height var(--swing),
+      perspective-origin var(--swing);
+  }
+  .shelf[data-mode='papers'] .shelf-stage {
+    height: var(--stage-top);
+    perspective-origin: 50% 50%;
+  }
+  .shelf-world {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transform-origin: 50% 100% calc(var(--pd) / -2);
+    transition: transform var(--swing);
+  }
+  .shelf[data-mode='papers'] .shelf-world {
+    transform: translate3d(var(--tx, 0px), calc(var(--stage-top) / -2), 0) scale(1.08) rotateX(-90deg);
+  }
+  /* The shelf top, receding from the front edge; seen face-on from above. */
+  .shelf-surface {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: calc(var(--pd) + 2rem);
+    background: rgba(var(--color-text-base), 0.04);
+    opacity: 0;
+    transform-origin: bottom;
+    transform: rotateX(90deg);
+    transition: opacity 0.5s ease;
+  }
+  .shelf[data-mode='papers'] .shelf-surface {
+    opacity: 1;
+    transition-delay: 0.3s;
+  }
+  /* The front edge, a hairline from the front. */
+  .shelf-edge {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: rgba(var(--color-text-base), 0.35);
+  }
+  .shelf-books {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    transform-style: preserve-3d;
+  }
+
+  /* ---------- Books ---------- */
+
+  /* A book's slot is a spine wide when shelved and a cover wide when open. */
+  .book {
+    --d: calc(var(--h) * var(--sa));
+    --w: calc(var(--h) * var(--ca));
+    position: relative;
+    flex: none;
+    width: var(--d);
+    height: var(--h);
+    transform-style: preserve-3d;
+    transition: width var(--turn);
+  }
+  .book.is-open {
+    width: var(--w);
+  }
+  .book-btn {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.25s ease;
+  }
+  .shelf[data-mode='books'] .book:not(.is-open) .book-btn:hover,
+  .shelf[data-mode='books'] .book:not(.is-open) .book-btn:focus-visible {
+    transform: translateY(-0.6rem);
+  }
+  .book-btn:focus-visible {
+    outline: none;
+  }
+  .book-btn:focus-visible .book-3d {
+    outline: 2px dashed rgb(var(--color-accent));
+    outline-offset: 4px;
+  }
+
+  /* The box: cover in front, spine on its left, pages on its right, top above.
+     Shelved, it is turned a quarter so the spine faces out; the translate keeps
+     the facing side on the shelf's front plane so nothing grows as it turns. */
+  .book-3d {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: var(--w);
+    height: var(--h);
+    margin-left: calc(var(--w) / -2);
+    transform-style: preserve-3d;
+    transform: translateZ(calc(var(--w) / -2)) rotateY(90deg);
+    transition: transform var(--turn);
+  }
+  .book.is-open .book-3d {
+    transform: translateZ(calc(var(--d) / -2)) rotateY(0deg);
+  }
+  .book-face {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    overflow: hidden;
+    backface-visibility: hidden;
+  }
+  .book-face img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .book-cover {
+    left: 0;
+    width: var(--w);
+    border-radius: 1px 3px 3px 1px;
+    transform: translateZ(calc(var(--d) / 2));
+  }
+  .book-spine {
+    left: 50%;
+    width: var(--d);
+    margin-left: calc(var(--d) / -2);
+    border-radius: 2px;
+    transform: rotateY(-90deg) translateZ(calc(var(--w) / 2));
+  }
+  /* A drawn spine: cover color, accent rules at head and foot, lettering set
+     top to bottom like an English-language spine. */
+  .book-spine-drawn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(var(--h) * 0.07) 0 calc(var(--h) * 0.06);
+    background:
+      linear-gradient(
+        to bottom,
+        transparent calc(var(--h) * 0.022),
+        var(--accent) 0 calc(var(--h) * 0.03),
+        transparent 0 calc(100% - var(--h) * 0.03),
+        var(--accent) 0 calc(100% - var(--h) * 0.022),
+        transparent 0
+      ),
+      var(--bg);
+    color: var(--ink);
+  }
+  .spine-title,
+  .spine-author {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    line-height: 1.08;
+    white-space: nowrap;
+  }
+  .spine-title {
+    max-height: calc(var(--h) * 0.7);
+    font-family: var(--font-display);
+    font-size: calc(var(--h) * var(--kt));
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+  .book-spine-drawn[data-lines='2'] .spine-title {
+    white-space: normal;
+    text-wrap: balance;
+    max-width: calc(var(--d) * 0.84);
+  }
+  .spine-author {
+    font-size: calc(var(--h) * var(--ka));
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .spine-author[data-accent] {
+    color: var(--accent);
+  }
+  .book-pages {
+    left: 50%;
+    width: var(--d);
+    margin-left: calc(var(--d) / -2);
+    background: repeating-linear-gradient(90deg, #f4efe2 0 1px, #e3dccb 1px 2px);
+    transform: rotateY(90deg) translateZ(calc(var(--w) / 2));
+  }
+  /* The top: page edges framed by the boards, in the cover's color. */
+  .book-top {
+    top: 50%;
+    left: 0;
+    width: var(--w);
+    height: var(--d);
+    margin-top: calc(var(--d) / -2);
+    border: 2px solid var(--edge);
+    border-left-width: 3px;
+    background: repeating-linear-gradient(0deg, #f4efe2 0 1px, #e6dfcf 1px 2px);
+    transform: rotateX(90deg) translateZ(calc(var(--h) / 2));
+  }
+  /* Light from the upper left: a rounded spine, a hinge shadow on the cover. */
+  .book-spine::after,
+  .book-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .book-spine::after {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.28),
+      rgba(255, 255, 255, 0.12) 35%,
+      rgba(0, 0, 0, 0) 60%,
+      rgba(0, 0, 0, 0.22)
+    );
+  }
+  .book-cover::after {
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.04) 4%, rgba(0, 0, 0, 0) 9%);
+  }
+
+  /* Hover labels: title and author above a spine, or the papers above the stack. */
+  .book-tip,
+  .stack-tip {
+    position: absolute;
+    bottom: calc(100% + 1.1rem);
+    left: 50%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    width: max-content;
+    max-width: 17rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--ink-faint);
+    border-radius: 0.45rem;
+    background: rgb(var(--color-card));
+    box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.35);
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: center;
+    opacity: 0;
+    transform: translate(-50%, 4px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease;
+    pointer-events: none;
+  }
+  .book-tip b,
+  .stack-tip b {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    text-wrap: balance;
+  }
+  .book-tip span,
+  .stack-tip span {
+    opacity: 0.75;
+  }
+  .shelf[data-mode='books'] .book:not(.is-open):has(.book-btn:hover, .book-btn:focus-visible) .book-tip,
+  .shelf[data-mode='books'] .stack:has(.stack-open:hover, .stack-open:focus-visible) .stack-tip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 0.08s;
+  }
+  .stack-tip {
+    bottom: calc(100% + 3rem);
+  }
+
+  /* ---------- Papers ---------- */
+
+  /* The stack lies on the shelf: from the front, its edge of sheets; its top,
+     the first page of the paper on top, lies flat and recedes. */
+  .stack {
+    position: relative;
+    flex: none;
+    width: var(--pw);
+    height: var(--pt);
+    margin-left: 2.25rem;
+    border-radius: 1px;
+    background: repeating-linear-gradient(to bottom, #f7f5ef 0 2px, #d6d0c2 2px 3px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+    transform-style: preserve-3d;
+  }
+  .stack-open {
+    position: absolute;
+    right: -0.5rem;
+    bottom: 0;
+    left: -0.5rem;
+    height: calc(var(--pt) + 2.5rem);
+    padding: 0;
+    border: 0;
+    border-radius: 0.4rem;
+    background: transparent;
+    cursor: pointer;
+  }
+  .stack-open:focus-visible {
+    outline: 2px dashed rgb(var(--color-accent));
+    outline-offset: 2px;
+  }
+  .shelf[data-mode='papers'] .stack-open {
+    display: none;
+  }
+  .stack-top {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    height: var(--pd);
+    transform-origin: bottom;
+    transform: rotateX(90deg);
+    transform-style: preserve-3d;
+    pointer-events: none;
+  }
+  /* Sheets stacked a hair apart; --pos 0 is the top page. */
+  .sheet {
+    position: absolute;
+    inset: 0;
+    display: block;
+    overflow: hidden;
+    border-radius: 1px;
+    background: #fff;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.06),
+      0 2px 6px rgba(0, 0, 0, 0.12);
+    transform: translateZ(calc(var(--pos, 0) * -1px));
+    transition:
+      transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 0.38s ease,
+      box-shadow 0.2s ease;
+    pointer-events: none;
+  }
+  .sheet img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+  .shelf[data-mode='papers'] .sheet.is-top {
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .shelf[data-mode='papers'] .sheet.is-top:hover,
+  .shelf[data-mode='papers'] .sheet.is-top:focus-visible {
+    box-shadow:
+      0 0 0 1px rgba(var(--color-accent), 0.6),
+      0 10px 24px rgba(0, 0, 0, 0.22);
+    transform: translateZ(4px);
+  }
+  .sheet:focus-visible {
+    outline: 2px dashed rgb(var(--color-accent));
+    outline-offset: 3px;
+  }
+  /* Filing: the top page slides off toward the front of the shelf. */
+  .sheet.is-leaving {
+    opacity: 0;
+    transform: translate3d(0, 108%, 2px);
+  }
+  .sheet.no-anim {
+    transition: none;
+  }
+  /* The arrows and count lie flat beside the stack; they come into view as the
+     camera rises. */
+  .stack-ctrl {
+    position: absolute;
+    bottom: 100%;
+    left: calc(100% + 1rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 2.75rem;
+    height: var(--pd);
+    opacity: 0;
+    transform-origin: bottom;
+    transform: rotateX(90deg);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .shelf[data-mode='papers'] .stack-ctrl {
+    opacity: 1;
+    transition-delay: 0.45s;
+    pointer-events: auto;
+  }
+  .stack-arrow {
+    display: grid;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
+    border: 1.5px solid var(--ink-faint);
+    border-radius: 50%;
+    background: rgb(var(--color-card));
+    color: inherit;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease,
+      opacity 0.2s ease;
+  }
+  .stack-arrow:hover:not(:disabled),
+  .stack-arrow:focus-visible {
+    border-color: rgb(var(--color-accent));
+    background: rgba(var(--color-accent), 0.1);
+  }
+  .stack-arrow:disabled {
+    cursor: default;
+    opacity: 0.35;
+  }
+  .stack-arrow svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .stack-count {
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .stack-count span {
+    opacity: 0.6;
+  }
+
+  /* In the papers view the books are scenery. */
+  .shelf[data-mode='papers'] .book-btn {
+    cursor: default;
+  }
+
+  /* ---------- Controls and panels below the shelf ---------- */
+
+  .shelf-modes {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    width: max-content;
+    margin: 1rem auto 0;
+    padding: 3px;
+    border: 1.5px solid var(--ink-faint);
+    border-radius: 999px;
+  }
+  .shelf-mode {
+    padding: 0.3rem 1rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    opacity: 0.7;
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease,
+      opacity 0.25s ease;
+  }
+  .shelf-mode:hover {
+    opacity: 1;
+  }
+  .shelf-mode[aria-pressed='true'] {
+    background: rgb(var(--color-accent));
+    color: rgb(var(--color-fill));
+    opacity: 1;
+  }
+  .shelf:not(.is-js) .shelf-modes {
+    display: none;
+  }
+
+  /* Panels: all visible without JS; with JS, only the open book's, in step with its turn. */
+  .shelf-panels,
+  .paper-captions {
+    position: relative;
+    max-width: 40rem;
+    margin: 0 auto;
+  }
+  .shelf-panel {
+    --caret: 50%;
+    position: relative;
+    margin-top: 1.25rem;
+    padding: 1.1rem 1.25rem 1.2rem;
+    border: 1.5px solid var(--ink-faint);
+    border-radius: 0.6rem;
+    background: rgb(var(--color-card));
+  }
+  .shelf-panel::before {
+    content: '';
+    position: absolute;
+    top: -0.5rem;
+    left: var(--caret);
+    width: 0.9rem;
+    height: 0.9rem;
+    border-top: 1.5px solid var(--ink-faint);
+    border-left: 1.5px solid var(--ink-faint);
+    background: rgb(var(--color-card));
+    transform: translateX(-50%) rotate(45deg);
+  }
+  .shelf.is-js .shelf-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px);
+    transition:
+      opacity 0.3s ease,
+      transform 0.35s ease,
+      visibility 0s linear 0.35s;
+  }
+  .shelf.is-js .shelf-panel.is-on {
+    position: relative;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition:
+      opacity 0.45s ease,
+      transform var(--turn);
+  }
+  .shelf:not(.is-js) .shelf-close,
+  .shelf:not(.is-js) .shelf-panel::before {
+    display: none;
+  }
+  .shelf-close {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    display: grid;
+    place-items: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    transition:
+      opacity 0.2s ease,
+      background-color 0.2s ease;
+  }
+  .shelf-close:hover,
+  .shelf-close:focus-visible {
+    background: rgba(var(--color-text-base), 0.08);
+    opacity: 1;
+  }
+  .shelf-close svg,
+  .shelf-link svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .shelf-title {
+    margin: 0 2rem 0.2rem 0;
+    font-size: 1.2rem;
+    line-height: 1.25;
+  }
+  .shelf-title small {
+    display: block;
+    margin-top: 0.15rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+  .shelf-meta {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    opacity: 0.75;
+  }
+  .shelf-why {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+  }
+  .shelf-quote {
+    margin: 0 0 0.9rem;
+    padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid rgba(var(--color-accent), 0.55);
+    font-style: italic;
+  }
+  .shelf-quote p {
+    margin: 0;
+  }
+  .shelf-quote footer {
+    margin-top: 0.35rem;
+    font-size: 0.85rem;
+    font-style: normal;
+    font-weight: 500;
+  }
+  .shelf-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.85rem;
+    border: 1.5px solid rgb(var(--color-accent));
+    border-radius: 999px;
+    color: rgb(var(--color-accent));
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+  }
+  .shelf-link:hover,
+  .shelf-link:focus-visible {
+    background: rgba(var(--color-accent), 0.12);
+  }
+
+  /* The paper's name under the shelf, papers view only (all of them without JS). */
+  .paper-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 1rem 0 0;
+    font-size: 0.9rem;
+    text-align: center;
+  }
+  .paper-caption a {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+  .paper-caption span {
+    font-size: 0.85rem;
+    opacity: 0.75;
+  }
+  .shelf.is-js .paper-caption {
+    display: none;
+  }
+  .shelf.is-js[data-mode='papers'] .paper-caption.is-on {
+    display: flex;
+    animation: caption-in 0.4s ease both;
+  }
+  @keyframes caption-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  .shelf[data-mode='papers'] .shelf-panels {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .book,
+    .book-3d,
+    .book-btn,
+    .book-tip,
+    .stack-tip,
+    .shelf-world,
+    .sheet,
+    .stack-ctrl,
+    .shelf-panel,
+    .shelf.is-js .shelf-panel.is-on {
+      transition: none;
+    }
+    .shelf.is-js[data-mode='papers'] .paper-caption.is-on {
+      animation: none;
+    }
+  }
+</style>

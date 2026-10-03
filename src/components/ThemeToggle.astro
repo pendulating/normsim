@@ -1,0 +1,44 @@
+---
+/* data-theme="light" | "dark" on <html>, persisted to localStorage. */
+---
+
+<button
+  id="theme-btn"
+  type="button"
+  class="themed inline-flex size-10 cursor-pointer items-center justify-center rounded-full border border-skin-base/35 bg-transparent p-0 text-skin-base hover:bg-skin-card"
+  aria-label="Switch to dark theme"
+  aria-pressed="false"
+>
+  <svg class="icon-sun size-[1.1rem] dark:hidden" viewBox="0 0 24 24" aria-hidden="true"
+    ><path
+      d="M12 4.5a1 1 0 0 1 1 1V7a1 1 0 1 1-2 0V5.5a1 1 0 0 1 1-1Zm0 12.5a1 1 0 0 1 1 1v1.5a1 1 0 1 1-2 0V18a1 1 0 0 1 1-1Zm7.5-5.5a1 1 0 0 1 0 2H18a1 1 0 1 1 0-2h1.5ZM7 12a1 1 0 0 1-1 1H4.5a1 1 0 1 1 0-2H6a1 1 0 0 1 1 1Zm10.3-5.3a1 1 0 0 1 0 1.4l-1.06 1.06a1 1 0 1 1-1.42-1.42l1.06-1.06a1 1 0 0 1 1.42 0ZM9.18 14.82a1 1 0 0 1 0 1.42L8.12 17.3a1 1 0 1 1-1.42-1.42l1.06-1.06a1 1 0 0 1 1.42 0Zm8.12 1.06a1 1 0 0 1-1.42 1.42l-1.06-1.06a1 1 0 0 1 1.42-1.42l1.06 1.06ZM8.12 6.7l1.06 1.06a1 1 0 1 1-1.42 1.42L6.7 8.12A1 1 0 0 1 8.12 6.7ZM12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z"
+    ></path></svg
+  >
+  <svg class="icon-moon hidden size-[1.1rem] dark:block" viewBox="0 0 24 24" aria-hidden="true"
+    ><path
+      d="M14.5 3.2a1 1 0 0 1 .1 1.1A7 7 0 0 0 19.7 14.4a1 1 0 0 1 1.1.1 1 1 0 0 1 .3 1.1A9 9 0 1 1 13.4 3a1 1 0 0 1 1.1.2Z"
+    ></path></svg
+  >
+</button>
+
+<script>
+  const STORAGE_KEY = 'theme';
+  const root = document.documentElement;
+  const btn = document.getElementById('theme-btn');
+
+  const current = () => (root.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+
+  function apply(theme: 'light' | 'dark') {
+    root.setAttribute('data-theme', theme);
+    btn?.setAttribute('aria-label', theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme');
+    btn?.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      /* storage may be unavailable; the attribute still applies */
+    }
+  }
+
+  apply(current());
+  btn?.addEventListener('click', () => apply(current() === 'dark' ? 'light' : 'dark'));
+</script>

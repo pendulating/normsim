@@ -1,0 +1,41 @@
+/* Design tokens. Values are copied from ~/style/frontend-palette.md and are the
+   source of truth; do not re-pick them. Colors are RGB triplets so they compose
+   with alpha: rgb(var(--color-accent)) solid, rgba(var(--color-accent), 0.55)
+   translucent. Light is a cool near-neutral scheme; dark is warm-on-navy. The
+   two are not the same palette inverted, and the asymmetry is the look. */
+
+:root,
+html[data-theme='light'] {
+  --color-fill: 251, 254, 251;
+  --color-text-base: 40, 39, 40;
+  --color-accent: 0, 108, 172;
+  --color-card: 230, 230, 230;
+  --color-card-muted: 205, 205, 205;
+  --color-border: 236, 233, 233;
+}
+
+html[data-theme='dark'] {
+  --color-fill: 33, 39, 55;
+  --color-text-base: 234, 237, 243;
+  --color-accent: 255, 107, 1;
+  --color-card: 52, 63, 96;
+  --color-card-muted: 138, 51, 2;
+  --color-border: 171, 75, 8;
+}
+
+:root {
+  /* Every theme-sensitive property transitions through this one token so a
+     toggle never produces a staggered repaint. */
+  --theme-transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease, fill 0.3s ease;
+
+  /* Parabolica from the TypeKit kit krx4hav. `parabolica` is the display cut,
+     `parabolica-text` the text cut. The kit is a network dependency, so a real
+     fallback stack always ships. */
+  --font-display: 'parabolica', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
+  --font-body: 'parabolica-text', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, sans-serif;
+
+  --header-height: 72px;
+}

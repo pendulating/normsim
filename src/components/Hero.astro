@@ -1,0 +1,48 @@
+---
+import { paper } from '../data/paper';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const pdfHref = `${base}/${paper.links.pdf}`;
+const names = paper.authors.map((a) => a.name);
+const authorLine = `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+---
+
+<section class="pt-10 pb-8 sm:pt-16 sm:pb-12" id="top">
+  <div class="wrap-wide">
+    <blockquote class="mb-8 max-w-[34rem] italic opacity-80">
+      {paper.epigraph.text}
+      <cite class="mt-1.5 block text-sm font-medium not-italic"
+        ><a href={paper.epigraph.href}>{paper.epigraph.source}</a></cite
+      >
+    </blockquote>
+
+    <h1 class="text-balance text-[clamp(2rem,1.2rem+3.2vw,3.25rem)] tracking-[-0.01em]">{paper.title}</h1>
+
+    <p class="mt-6 text-[1.05rem]">
+      {authorLine}
+      <small class="mt-1 block">{paper.affiliation}</small>
+    </p>
+
+    <span class="project-venue mt-4">{paper.venue}</span>
+
+    <div class="mt-7 flex flex-wrap gap-3">
+      <a class="project-button" href={pdfHref}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            d="M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.5V9h5.5L13 3.5ZM8 13h8v1.5H8V13Zm0 3.5h8V18H8v-1.5Z"
+          ></path></svg
+        >
+        Paper (PDF)
+      </a>
+      <a class="project-button" href={paper.links.code}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.84c.85 0 1.71.11 2.51.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"
+          ></path></svg
+        >
+        Code and corpus inspector
+      </a>
+      <a class="project-button" href="#cite">Cite</a>
+    </div>
+  </div>
+</section>

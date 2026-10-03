@@ -1,0 +1,10 @@
+---
+import Section from './Section.astro';
+import Bookshelf from './Bookshelf.astro';
+import { readingIntro } from '../data/readings';
+---
+
+<Section id="reading" title="Further reading">
+  {readingIntro && <p>{readingIntro}</p>}
+  <Bookshelf />
+</Section>

@@ -1,0 +1,374 @@
+---
+/* Phase 1, supervised fine-tuning, as a four-step diagram on the shared
+   StepDiagram shell: a real training pair, a negative pair, the LoRA update,
+   and the gap SFT leaves for the two Phase 2 arms. */
+import StepDiagram from './StepDiagram.astro';
+import TrainingCurve, { type CurveSeries } from './TrainingCurve.astro';
+import { sft } from '../data/training';
+
+const ex = sft.example;
+const neg = sft.negative;
+const ag = sft.agreement;
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+const bars = [
+  { label: 'appropriate flows', v: ag.appropriate },
+  { label: 'inappropriate flows', v: ag.inappropriate },
+  { label: 'macro average', v: ag.macro },
+];
+
+/* Loss curves, by epoch: gpt-oss-20b ran 270 steps, the rest 540. */
+const curves = sft.curves.map((c) => ({ ...c, first: c.points[0][1], last: c.points[c.points.length - 1][1] }));
+const base = curves.find((c) => c.model === sft.base)!;
+const others = curves.filter((c) => c !== base);
+const series: CurveSeries[] = [
+  ...others.map((c) => ({
+    name: c.model,
+    points: c.points,
+    tone: 'muted' as const,
+    title: `${c.model}: loss ${c.first.toFixed(2)} → ${c.last.toFixed(2)}, token accuracy ${pct(c.accuracy)}`,
+  })),
+  {
+    name: base.model,
+    points: base.points,
+    tone: 'accent',
+    end: [base.model, `${base.last.toFixed(2)} · ${pct(base.accuracy)}`],
+  },
+];
+---
+
+<StepDiagram name={sft.name} pipeline={sft.pipeline} steps={sft.steps}>
+  <!-- 1. A positive pair. -->
+  <div class="td-view" data-view-of="pair">
+    <p class="sft-head">
+      Training pair · <span class="sft-book">{ex.book}</span>, chunk {ex.chunkId} · verbatim, trimmed
+    </p>
+    <div class="td-flow">
+      <section class="td-card" aria-label="Input">
+        <header class="td-head-row">
+          <h4 class="td-title">Input</h4>
+          <span class="td-meta">instruction + raw chunk</span>
+        </header>
+        <p class="sft-instr">{ex.instruction}</p>
+        <div class="td-inset sft-doc">
+          {ex.chunk.map((p) => <p>{p}</p>)}
+        </div>
+      </section>
+      <section class="td-card" aria-label="Target">
+        <header class="td-head-row">
+          <h4 class="td-title">Target</h4>
+          <span class="td-meta">teacher’s trace, then tuples</span>
+        </header>
+        <p class="sft-field"><code>reasoning</code></p>
+        <p class="sft-reason">{ex.reasoning}</p>
+        <p class="sft-field">
+          <code>has_information_exchange</code> <b>true</b>
+        </p>
+        <p class="sft-field"><code>flows[{ex.flowIndex}]</code></p>
+        <div class="td-inset">
+          <dl class="td-slots">
+            {
+              ex.flow.slots.map((s) => (
+                <Fragment>
+                  <dt>
+                    <span class="td-sym">{s.sym}</span> {s.label}
+                  </dt>
+                  <dd>{s.value}</dd>
+                </Fragment>
+              ))
+            }
+          </dl>
+          <p class="td-pills">
+            <span class="td-pill td-pill-accent">appropriateness {ex.flow.appropriateness}</span>
+            {ex.flow.context && <span class="td-pill">context {ex.flow.context}</span>}
+          </p>
+        </div>
+        <p class="td-note">
+          Flow {ex.flowIndex + 1} of {ex.flowsTotal} in this target; the label is the teacher’s own, made with no norm in
+          context. {sft.pairs.total.toLocaleString('en-US')} pairs in all ({sft.pairs.negative} negative).
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 2. A negative pair. -->
+  <div class="td-view" data-view-of="negative">
+    <p class="sft-head">
+      Negative pair · <span class="sft-book">{neg.book}</span>, chunk {neg.chunkId} · verbatim, trimmed
+    </p>
+    <div class="td-flow">
+      <section class="td-card" aria-label="Input">
+        <header class="td-head-row">
+          <h4 class="td-title">Input</h4>
+          <span class="td-meta">a contentless chunk</span>
+        </header>
+        <div class="td-inset sft-doc">
+          {neg.chunk.map((p) => <p>{p}</p>)}
+        </div>
+      </section>
+      <section class="td-card" aria-label="Target">
+        <header class="td-head-row">
+          <h4 class="td-title">Target</h4>
+          <span class="td-meta">abstain</span>
+        </header>
+        <p class="sft-field"><code>reasoning</code></p>
+        <p class="sft-reason">{neg.reasoning}</p>
+        <p class="sft-field">
+          <code>has_information_exchange</code> <b class="sft-accent">false</b>
+        </p>
+        <p class="sft-field">
+          <code>flows</code> <b class="sft-accent">[ ]</b>
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 3. The LoRA update; 4. adds what SFT does not teach. -->
+  <div class="td-view is-on sft-train" data-view-of="train">
+    <div class="td-card sft-lora">
+      <svg class="sft-lora-fig" viewBox="0 0 360 170" role="img" aria-label="LoRA: frozen weights W plus a trained low-rank update B times A">
+        <rect class="sft-w" x="10" y="20" width="120" height="120" rx="6" />
+        <text x="70" y="86" class="sft-big">W</text>
+        <text x="70" y="160" class="sft-small">frozen, d × d</text>
+        <text x="152" y="88" class="sft-op">+</text>
+        <rect class="sft-ab" x="178" y="20" width="22" height="120" rx="4" />
+        <text x="189" y="160" class="sft-small">B</text>
+        <text x="215" y="88" class="sft-op">·</text>
+        <rect class="sft-ab" x="232" y="69" width="120" height="22" rx="4" />
+        <text x="292" y="114" class="sft-small">A, rank r = 64</text>
+        <text x="292" y="132" class="sft-small">trained, scaled by α / r = 2</text>
+      </svg>
+      <div class="sft-lora-text">
+        <p>
+          Each instruction-tuned model keeps its weights frozen and trains a rank-64 update on every linear projection.
+          The loss is the standard next-token likelihood of the teacher’s target.
+        </p>
+        <p class="td-pills">
+          {sft.hyper.map((h) => <span class="td-pill">{h}</span>)}
+        </p>
+        <p class="td-note">
+          11 task LLMs from 2B to 20B parameters. Both Phase 2 arms train Qwen3.5-9B from its merged SFT checkpoint.
+        </p>
+      </div>
+    </div>
+    <div class="sft-after">
+    <div class="td-card sft-curves" data-show-from="3" data-focus="3">
+      <header class="td-head-row">
+        <h4 class="td-title">SFT fits the teacher’s targets</h4>
+        <span class="td-meta">training loss, log scale</span>
+      </header>
+      <TrainingCurve
+        label={`SFT training loss over three epochs for ${curves.length} task LLMs; ${sft.base} falls from ${base.first.toFixed(2)} to ${base.last.toFixed(2)}`}
+        series={series}
+        legend={[
+          { tone: 'accent', label: `${sft.base}, the Phase 2 base` },
+          { tone: 'muted', label: `the other ${others.length} task LLMs` },
+        ]}
+        x={{ max: 3, ticks: [0, 1, 2, 3], label: 'epoch' }}
+        y={{ min: 0.28, max: 3.3, ticks: [0.3, 0.5, 1, 2, 3], log: true }}
+        yName="loss"
+        table={{
+          head: ['Model', 'Steps', 'First loss', 'Final loss', 'Token acc.'],
+          rows: curves.map((c) => [c.model, c.steps, c.first.toFixed(3), c.last.toFixed(3), pct(c.accuracy)]),
+        }}
+      >
+        <p class="td-note">
+          Next-token loss on the teacher’s targets, logged every 10 optimizer steps. Every run converges; {sft.base} ends
+          at {pct(base.accuracy)} token accuracy.
+        </p>
+      </TrainingCurve>
+    </div>
+    <div class="td-card sft-gap" data-show-from="3" data-focus="3">
+      <header class="td-head-row">
+        <h4 class="td-title">Do the SFT labels agree with the novel’s norms?</h4>
+        <span class="td-meta">{ag.n.toLocaleString('en-US')} teacher flows vs. norm-derived reference</span>
+      </header>
+      <div class="sft-bars">
+        {
+          bars.map((b) => (
+            <Fragment>
+              <span class="sft-bar-label">{b.label}</span>
+              <span class="sft-bar-track">
+                <span class="sft-bar" style={`--v:${b.v}`} />
+                <span class="sft-blanket" style={`--v:${ag.blanket}`} />
+              </span>
+              <span class="sft-bar-value">{pct(b.v)}</span>
+            </Fragment>
+          ))
+        }
+      </div>
+      <p class="td-note">
+        Dashed line: the 50% macro agreement a blanket label earns. Judging from weights alone, the labels SFT learns fall
+        below it. SFT teaches the form of a CI judgment; Phase 2 makes the judgment answer to the text’s norms.
+      </p>
+    </div>
+    </div>
+  </div>
+</StepDiagram>
+
+<style>
+  .sft-head {
+    margin: 0 0 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    opacity: 0.8;
+  }
+  .sft-book {
+    font-weight: 700;
+    font-style: italic;
+  }
+  .sft-instr {
+    margin: 0 0 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+    opacity: 0.75;
+  }
+  .sft-doc p {
+    margin: 0 0 0.55em;
+  }
+  .sft-doc p:last-child {
+    margin-bottom: 0;
+  }
+  .sft-field {
+    margin: 0.5rem 0 0.2rem;
+  }
+  .sft-field:first-of-type {
+    margin-top: 0;
+  }
+  .sft-field code {
+    opacity: 0.7;
+  }
+  .sft-reason {
+    margin: 0;
+    padding-left: 0.65rem;
+    border-left: 2px solid var(--td-ink-soft);
+  }
+  .sft-accent {
+    color: rgb(var(--color-accent));
+  }
+
+  /* LoRA. */
+  .sft-lora {
+    display: grid;
+    gap: 1rem 2rem;
+    align-items: center;
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+  @media (min-width: 720px) {
+    .sft-lora {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+  }
+  .sft-lora-fig {
+    width: 100%;
+    max-width: 24rem;
+    height: auto;
+    margin: 0 auto;
+    overflow: visible;
+  }
+  .sft-lora-text p {
+    margin: 0 0 0.5rem;
+  }
+  .sft-w {
+    fill: rgba(var(--color-text-base), 0.08);
+    stroke: var(--td-ink-soft);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 3;
+  }
+  .sft-ab {
+    fill: rgba(var(--color-accent), 0.18);
+    stroke: rgb(var(--color-accent));
+    stroke-width: 1.5;
+  }
+  .sft-lora-fig text {
+    fill: rgb(var(--color-text-base));
+    text-anchor: middle;
+  }
+  .sft-big {
+    font-size: 30px;
+    font-style: italic;
+    font-weight: 700;
+    opacity: 0.6;
+  }
+  .sft-op {
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .sft-small {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* Step 4: the loss curves beside the agreement bars. */
+  .sft-after {
+    display: grid;
+    gap: 1rem;
+    max-width: 52rem;
+    margin: 1rem auto 0;
+  }
+  @media (min-width: 860px) {
+    .sft-after {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: start;
+    }
+  }
+
+  /* Agreement bars. */
+  .sft-bars {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) 3.5rem;
+    align-items: center;
+    gap: 0.55rem 0.75rem;
+    margin-top: 0.4rem;
+  }
+  .sft-bar-label {
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .sft-bar-track {
+    position: relative;
+    height: 1.1rem;
+    border-radius: 3px;
+    background: rgba(var(--color-text-base), 0.07);
+  }
+  .sft-bar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: calc(var(--v) * 100%);
+    border-radius: 3px;
+    background: rgba(var(--color-text-base), 0.55);
+    transform-origin: left;
+    transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
+  }
+  .sft-bars > :nth-child(5) .sft-bar {
+    background: rgb(var(--color-accent));
+  }
+  .sft-gap:global(.is-hidden) .sft-bar,
+  :global(.td-view:not(.is-on)) .sft-bar {
+    transform: scaleX(0);
+    transition: none;
+  }
+  .sft-blanket {
+    position: absolute;
+    top: -0.25rem;
+    bottom: -0.25rem;
+    left: calc(var(--v) * 100%);
+    border-left: 1.5px dashed rgb(var(--color-text-base));
+  }
+  .sft-bar-value {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  @media (max-width: 559px) {
+    .sft-bars {
+      grid-template-columns: minmax(0, 1fr) 3rem;
+    }
+    .sft-bar-label {
+      grid-column: 1 / -1;
+      margin-bottom: -0.35rem;
+    }
+  }
+</style>

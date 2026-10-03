@@ -1,0 +1,90 @@
+---
+import Section from './Section.astro';
+import NormUniverseDiagram from './NormUniverseDiagram.astro';
+import SftDiagram from './SftDiagram.astro';
+import GrpoDiagram from './GrpoDiagram.astro';
+import KtoDiagram from './KtoDiagram.astro';
+import ResultsFigure from './ResultsFigure.astro';
+import { methodIntro, stages } from '../data/method';
+import { figureCaption } from '../data/normUniverse';
+import { captions } from '../data/training';
+
+const train = [
+  { Diagram: SftDiagram, caption: captions.sft },
+  { Diagram: GrpoDiagram, caption: captions.grpo },
+  { Diagram: KtoDiagram, caption: captions.kto },
+];
+---
+
+<Section id="method" title="How it works">
+  <p class="max-w-[46rem]">{methodIntro}</p>
+
+  <h3 class="stage-head">
+    <small>{stages.extract.label}</small>
+    {stages.extract.title}
+  </h3>
+  <p class="max-w-[46rem]">{stages.extract.lead}</p>
+  <figure class="mt-6 mb-0">
+    <NormUniverseDiagram />
+    <figcaption class="mx-auto mt-5 max-w-[40rem] border-t border-skin-base/15 pt-3 text-center opacity-80">
+      {figureCaption}
+    </figcaption>
+  </figure>
+
+  <h3 class="stage-head">
+    <small>{stages.train.label}</small>
+    {stages.train.title}
+  </h3>
+  <p class="max-w-[46rem]">{stages.train.lead}</p>
+  {
+    train.map(({ Diagram, caption }) => (
+      <figure class="train-fig">
+        <p class="train-phase">
+          <small>{caption.phase}</small> {caption.title}
+        </p>
+        <Diagram />
+        <figcaption class="mx-auto mt-5 max-w-[40rem] border-t border-skin-base/15 pt-3 text-center opacity-80">
+          {caption.text}
+        </figcaption>
+      </figure>
+    ))
+  }
+
+  <h3 class="stage-head">
+    <small>{stages.evaluate.label}</small>
+    {stages.evaluate.title}
+  </h3>
+  <div class="max-w-[46rem]">
+    {stages.evaluate.paragraphs.map((p) => <p class="mb-3 last:mb-0">{p}</p>)}
+  </div>
+  <ResultsFigure />
+</Section>
+
+<style>
+  .stage-head {
+    margin: 3.5rem 0 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(var(--color-text-base), 0.12);
+    font-size: 1.35rem;
+  }
+  .stage-head small {
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+  .train-fig {
+    margin: 2.5rem 0 0;
+  }
+  .train-fig + .train-fig {
+    margin-top: 3.5rem;
+  }
+  .train-phase {
+    margin: 0 0 1.25rem;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  .train-phase small {
+    display: block;
+  }
+</style>

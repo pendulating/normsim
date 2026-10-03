@@ -1,0 +1,507 @@
+---
+/* Phase 2a, GRPO against the modular reward, as a six-step diagram on the
+   shared StepDiagram shell. One real group of G = 8 completions carries the
+   middle steps: sampled, routed, scored by the verifiable core and the two
+   judged auxiliaries, and turned into group-relative advantages. */
+import StepDiagram from './StepDiagram.astro';
+import TrainingCurve from './TrainingCurve.astro';
+import { grpo } from '../data/training';
+
+const g = grpo.group;
+const w = grpo.weights;
+const mean = g.completions.reduce((a, c) => a + c.r, 0) / g.completions.length;
+// Advantage bars are scaled to the group's largest |advantage|.
+const maxAbs = Math.max(...g.completions.map((c) => Math.abs(c.r - mean)), 1e-9);
+const fmt = (v: number | null | undefined) => (v == null ? '–' : v.toFixed(2));
+const sign = (v: number) => (v > 0 ? `+${v.toFixed(2)}` : v.toFixed(2));
+const routeLabel: Record<string, string> = { scored: 'scored', abstain: 'abstain', invalid: 'invalid' };
+const total = grpo.prompts.total;
+const d = grpo.direct;
+const fmt3 = (v: number) => v.toFixed(3).replace(/0$/, '');
+const rc = grpo.curve.points;
+const rLo = Math.min(...rc.map((p) => p[1]));
+const rHi = Math.max(...rc.map((p) => p[1]));
+---
+
+<StepDiagram name={grpo.name} pipeline={grpo.pipeline} steps={grpo.steps} loop={grpo.loop}>
+  <!-- 1. The pre-screened prompt mix. -->
+  <div class="td-view" data-view-of="prompts">
+    <div class="td-card gr-prompts">
+      <header class="td-head-row">
+        <h4 class="td-title">{total} training prompts</h4>
+        <span class="td-meta">selected from {grpo.prompts.pool.toLocaleString('en-US')} by within-stratum reward spread</span>
+      </header>
+      <div class="gr-stack" role="img" aria-label={grpo.prompts.parts.map((p) => `${p.n} ${p.label}`).join(', ')}>
+        {grpo.prompts.parts.map((p) => <span class={`gr-seg gr-seg-${p.key}`} style={`--n:${p.n}`} />)}
+      </div>
+      <ul class="gr-legend">
+        {
+          grpo.prompts.parts.map((p) => (
+            <li>
+              <span class={`gr-swatch gr-seg-${p.key}`} />
+              <b>{p.n}</b> {p.label}
+            </li>
+          ))
+        }
+      </ul>
+      <div class="gr-tasks">
+        <div class="td-inset">
+          <p class="gr-task-head">Extraction <span class="td-meta">82%</span></p>
+          <p class="gr-task-body">
+            A fiction chunk and the extraction instruction. The policy writes its reasoning and the chunk’s CI flows, each
+            with an appropriateness label, and is scored by the modular reward.
+          </p>
+        </div>
+        <div class="td-inset">
+          <p class="gr-task-head">Judgment set <span class="td-meta">18%</span></p>
+          <p class="gr-task-body">
+            Up to eight scenarios from one novel and context. The policy assigns each a five-way deontic force, scored
+            programmatically by distance from the governing norm’s force: exact 1.0, same side 0.4, non-committal 0.15,
+            opposite 0.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-3. The group: sampled, then routed. 6. Advantages. -->
+  <div class="td-view" data-view-of="group advantage">
+    <p class="gr-head">
+      One real group · <span class="gr-book">{g.book}</span>, chunk {g.chunkId} · optimizer step {g.step} of {g.steps}
+    </p>
+    <div class="gr-wrap">
+    <ol class="gr-group">
+      {
+        g.completions.map((c, i) => (
+          <li class="gr-c" data-route={c.route}>
+            <span class="gr-c-id">#{i + 1}</span>
+            <span class="gr-c-summary">{c.summary}</span>
+            <span class="gr-c-route td-pill" data-show-from="2">
+              {routeLabel[c.route]}
+            </span>
+            <span class="gr-c-terms" data-show-from="5">
+              {c.route === 'scored' ? `D ${fmt(c.d)} · G ${fmt(c.g)} · C ${fmt(c.c)}` : ''}
+            </span>
+            <span class="gr-c-r" data-show-from="2">
+              R = <b>{fmt3(c.r)}</b>
+            </span>
+            <span class="gr-c-adv" data-show-from="5">
+              <span class="gr-adv-bar" data-neg={c.r < mean ? '' : undefined} style={`--a:${Math.abs(c.r - mean) / maxAbs}`} />
+              <span class="gr-adv-val">{sign(c.r - mean)}</span>
+            </span>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="td-note gr-foot" data-show-from="5">
+      Group mean <b>{mean.toFixed(3)}</b>. Advantage = R − mean, not divided by the group’s standard deviation, which would
+      inflate near-tie judge noise into full ±1 advantages. Truncated completions are masked from the loss.
+    </p>
+    </div>
+    <div class="td-card gr-curve" data-show-from="5" data-focus="5">
+      <header class="td-head-row">
+        <h4 class="td-title">Mean reward over the reported run</h4>
+        <span class="td-meta">m2 full cell, {grpo.curve.steps} optimizer steps</span>
+      </header>
+      <TrainingCurve
+        label={`GRPO mean reward over ${grpo.curve.steps} steps, from ${rc[0][1].toFixed(2)} to ${rc[rc.length - 1][1].toFixed(2)}`}
+        series={[{ name: 'mean reward', points: rc, tone: 'accent', end: ['mean R', rc[rc.length - 1][1].toFixed(2)] }]}
+        x={{ max: grpo.curve.steps, ticks: [0, 150, 300, 450], label: 'step' }}
+        y={{ min: 0.4, max: 0.7, ticks: [0.4, 0.5, 0.6, 0.7] }}
+        yName="reward"
+        digits={3}
+        table={{ head: ['Step', 'Mean reward'], rows: rc.map(([a, b]) => [a, b.toFixed(3)]) }}
+      >
+        <p class="td-note">
+          Mean R over each logged window of 10 optimizer steps, starting from the SFT policy. It stays between
+          {' '}{rLo.toFixed(2)} and {rHi.toFixed(2)} for the whole run; checkpoint {grpo.curve.steps} is the reported
+          policy.
+        </p>
+      </TrainingCurve>
+    </div>
+  </div>
+
+  <!-- 4. The verifiable core, on the chunk's one violation. -->
+  <div class="td-view gr-direct" data-view-of="direct">
+    <p class="gr-head">
+      R<sub>direct</sub> on the same group · weight {w.direct} · the chunk’s second teacher flow
+    </p>
+    <div class="td-flow">
+      <section class="td-card" aria-label="The teacher flow">
+        <header class="td-head-row">
+          <h4 class="td-title">Teacher flow</h4>
+          <span class="td-meta">part of the chunk-fixed denominator</span>
+        </header>
+        <dl class="td-slots">
+          {
+            d.flow.map((s) => (
+              <Fragment>
+                <dt>
+                  <span class="td-sym">{s.sym}</span> {s.label}
+                </dt>
+                <dd>{s.value}</dd>
+              </Fragment>
+            ))
+          }
+        </dl>
+      </section>
+      <section class="td-card" aria-label="The nearest information-governing norm">
+        <header class="td-head-row">
+          <h4 class="td-title">Nearest norm in 𝒩<sub>b</sub></h4>
+          <span class="td-meta">governs_info_flow only</span>
+        </header>
+        <p class="gr-norm">“{d.norm.text}”</p>
+        <p class="td-pills">
+          <span class="td-pill">force {d.norm.force}</span>
+          <span class="td-pill">act {d.norm.polarity}</span>
+        </p>
+        <p class="gr-rule">
+          {d.norm.force} × {d.norm.polarity} → <span class="td-pill td-pill-accent">{d.reference}</span>
+        </p>
+        <p class="td-note">
+          Obligatory and recommended render a flow appropriate; prohibited and discouraged, inappropriate. A norm that
+          governs refraining inverts them; permitted never inverts.
+        </p>
+      </section>
+      <section class="td-card" aria-label="Each completion's label for this flow">
+        <header class="td-head-row">
+          <h4 class="td-title">Compare</h4>
+          <span class="td-meta">string match, no model</span>
+        </header>
+        <table class="gr-cmp">
+          <thead>
+            <tr><th>#</th><th>policy’s label</th><th>cos</th><th>score</th></tr>
+          </thead>
+          <tbody>
+            {
+              d.matches.map((m) => (
+                <tr data-ok={m.label === d.reference ? '' : undefined}>
+                  <td>{m.completion}</td>
+                  <td>{m.label}</td>
+                  <td>{m.cos.toFixed(2)}</td>
+                  <td class="gr-score">{m.label === d.reference ? '1' : '0'}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+        <p class="td-note">
+          Flows match one-to-one at cosine ≥ τ = {grpo.tau}; an unmatched teacher flow scores 0, so extracting fewer,
+          safer flows cannot help. R<sub>direct</sub> macro-averages over the chunk’s two classes: only #5, right on both,
+          reaches 1.
+        </p>
+      </section>
+    </div>
+  </div>
+
+  <!-- 5. The judged auxiliaries and the composition. -->
+  <div class="td-view" data-view-of="aux">
+    <div class="td-flow gr-aux">
+      <section class="td-card" aria-label="Grounding in the novel's own norms">
+        <header class="td-head-row">
+          <h4 class="td-title">R<sub>ground</sub> · {w.ground}</h4>
+          <span class="td-meta">own novel, k = 3 norms</span>
+        </header>
+        <p>
+          The judge sees all eight completions against one shared set of the three norms nearest the group’s flows, and
+          returns a strict ranking plus an absolute grounding score per completion.
+        </p>
+        <p class="gr-eq">R<sub>ground</sub> = ½ · (G − rank)/(G − 1) + ½ · grounding</p>
+        <p class="td-note">
+          Two criteria only: do the norms a completion invokes match the retrieved ones, and are its flows governed by
+          them. Appropriateness is left to the core.
+        </p>
+      </section>
+      <section class="td-card" aria-label="Contrast against a wrong novel's norms">
+        <header class="td-head-row">
+          <h4 class="td-title">R<sub>contrast</sub> · {w.contrast}</h4>
+          <span class="td-meta">a wrong novel, fixed per chunk</span>
+        </header>
+        <p>
+          A second call gives the judge the same prompt with another training novel’s norms, without saying which
+          universe it holds. A completion distinctively of its own book grounds poorly there.
+        </p>
+        <p class="gr-eq">R<sub>contrast</sub> = 1 − grounding<sub>wrong</sub></p>
+        <p class="td-note">
+          For this group the wrong book was <i>{g.contrastBook}</i>, and every scored completion earned R<sub
+            >contrast</sub
+          > = 1.0: none grounded in Wonderland’s norms.
+        </p>
+      </section>
+    </div>
+    <div class="td-card gr-compose">
+      <p class="gr-eq gr-eq-big">
+        R = max( <b>{w.direct}</b> R<sub>direct</sub> + {w.ground} R<sub>ground</sub> + {w.contrast} R<sub>contrast</sub>
+        , {w.floor} )
+      </p>
+      <p class="td-note">
+        The core weighs twice each auxiliary; removing a module renormalizes the rest, so each auxiliary can be ablated by
+        editing a list. The floor keeps any valid extraction above an invalid completion or a wrong abstention.
+        Abstention route: {grpo.abstain.map((a) => `${a.when} ${a.r}`).join(', ')}.
+      </p>
+    </div>
+  </div>
+</StepDiagram>
+
+<style>
+  .gr-head {
+    margin: 0 0 0.9rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+    opacity: 0.8;
+  }
+  .gr-book {
+    font-weight: 700;
+    font-style: italic;
+  }
+
+  /* Prompts. */
+  .gr-prompts {
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+  .gr-stack {
+    display: flex;
+    height: 1.4rem;
+    overflow: hidden;
+    border-radius: 4px;
+  }
+  .gr-seg {
+    flex: var(--n) 0 0;
+    min-width: 3px;
+  }
+  .gr-seg + .gr-seg {
+    border-left: 2px solid rgb(var(--color-card));
+  }
+  .gr-seg-flows {
+    background: rgba(var(--color-text-base), 0.55);
+  }
+  .gr-seg-empty {
+    background: rgba(var(--color-text-base), 0.25);
+  }
+  .gr-seg-judge {
+    background: rgb(var(--color-accent));
+  }
+  .gr-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+    margin: 0.5rem 0 0.9rem;
+    padding: 0;
+    list-style: none;
+    font-size: 0.85rem;
+  }
+  .gr-swatch {
+    display: inline-block;
+    width: 0.7rem;
+    height: 0.7rem;
+    margin-right: 0.3rem;
+    border-radius: 2px;
+    vertical-align: -0.05rem;
+  }
+  .gr-tasks {
+    display: grid;
+    gap: 0.75rem;
+  }
+  @media (min-width: 720px) {
+    .gr-tasks {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  .gr-task-head {
+    display: flex;
+    justify-content: space-between;
+    margin: 0 0 0.3rem;
+    font-weight: 700;
+  }
+  .gr-task-body {
+    margin: 0;
+  }
+
+  /* The group. */
+  .gr-wrap {
+    max-width: 56rem;
+    margin: 0 auto;
+  }
+  .gr-group {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .gr-c {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) 4.5rem 9.5rem 5rem minmax(5rem, 9rem);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.45rem 0.75rem;
+    border: 1.5px solid var(--td-ink-faint);
+    border-radius: 0.5rem;
+    background: rgb(var(--color-card));
+    font-size: 0.85rem;
+    transition: var(--theme-transition);
+  }
+  .gr-c-id {
+    font-weight: 700;
+    opacity: 0.6;
+  }
+  .gr-c-summary {
+    overflow-wrap: anywhere;
+  }
+  .gr-c-route {
+    justify-self: start;
+  }
+  .gr-c[data-route='scored'] .gr-c-route {
+    border-color: rgb(var(--color-accent));
+    color: rgb(var(--color-accent));
+  }
+  .gr-c[data-route='invalid'] .gr-c-route {
+    border-style: dashed;
+    opacity: 0.7;
+  }
+  .gr-c-terms {
+    font-size: 0.78rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    opacity: 0.8;
+  }
+  .gr-c-r {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  /* Advantage: a bar left or right of a centre line. */
+  .gr-c-adv {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 1.2rem;
+    border-left: 0;
+  }
+  .gr-c-adv::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -0.2rem;
+    bottom: -0.2rem;
+    border-left: 1.5px solid var(--td-ink-soft);
+  }
+  .gr-adv-bar {
+    position: absolute;
+    top: 0.2rem;
+    bottom: 0.2rem;
+    left: 50%;
+    width: calc(var(--a) * 50%);
+    background: rgb(var(--color-accent));
+    border-radius: 2px;
+  }
+  /* Negative advantages: the bar grows left from the centre line. */
+  .gr-adv-bar[data-neg] {
+    left: auto;
+    right: 50%;
+    background: rgba(var(--color-text-base), 0.45);
+  }
+  .gr-adv-val {
+    position: relative;
+    z-index: 1;
+    margin-left: auto;
+    padding-left: 0.3rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: rgb(var(--color-card));
+  }
+  @media (max-width: 719px) {
+    .gr-c {
+      grid-template-columns: 1.5rem auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        'id sum sum sum'
+        '. route terms r'
+        '. adv adv adv';
+      gap: 0.25rem 0.5rem;
+      padding: 0.4rem 0.6rem;
+    }
+    .gr-c-id {
+      grid-area: id;
+    }
+    .gr-c-summary {
+      grid-area: sum;
+    }
+    .gr-c-route {
+      grid-area: route;
+    }
+    .gr-c-terms {
+      grid-area: terms;
+      font-size: 12px;
+    }
+    .gr-c-r {
+      grid-area: r;
+    }
+    .gr-c-adv {
+      grid-area: adv;
+    }
+  }
+
+  /* Core. */
+  /* Three cards abreast: stack each slot label over its value. */
+  .gr-direct :global(.td-slots) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.05rem;
+  }
+  .gr-direct :global(.td-slots dd) {
+    margin-bottom: 0.35rem;
+  }
+  .gr-norm {
+    margin: 0;
+    font-style: italic;
+  }
+  .gr-rule {
+    margin: 0.6rem 0 0;
+    font-weight: 700;
+  }
+  .gr-cmp {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .gr-cmp th {
+    padding: 0 0.4rem 0.25rem 0;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-align: left;
+    opacity: 0.75;
+  }
+  .gr-cmp td {
+    padding: 0.15rem 0.4rem 0.15rem 0;
+    border-top: 1px solid var(--td-ink-faint);
+  }
+  .gr-cmp tr[data-ok] td:nth-child(2),
+  .gr-cmp tr[data-ok] .gr-score {
+    color: rgb(var(--color-accent));
+    font-weight: 700;
+  }
+
+  /* Auxiliaries. */
+  .gr-aux p {
+    margin: 0 0 0.5rem;
+  }
+  .gr-eq {
+    font-style: italic;
+    text-align: center;
+  }
+  .gr-compose {
+    max-width: 44rem;
+    margin: 1rem auto 0;
+    text-align: center;
+  }
+  .gr-eq-big {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .gr-curve {
+    max-width: 30rem;
+    margin: 1rem auto 0;
+  }
+</style>

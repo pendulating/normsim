@@ -1,0 +1,20 @@
+---
+import { paper } from '../data/paper';
+const year = new Date().getFullYear();
+const authorList = paper.authors.map((a) => a.name);
+const authors =
+  authorList.length > 1
+    ? `${authorList.slice(0, -1).join(', ')}, and ${authorList[authorList.length - 1]}`
+    : authorList[0];
+---
+
+<footer class="themed border-t border-skin-line py-10 text-[0.95rem]">
+  <div class="wrap">
+    <p class="mb-3">{paper.funding}</p>
+    <p class="mb-3">
+      Questions and correspondence: <a href={`mailto:${paper.contact}`}>{paper.contact}</a>. Code, the evaluation zoo, and
+      the fiction10 corpus inspector are on <a href={paper.links.code}>GitHub</a>.
+    </p>
+    <p class="mb-0"><small>&copy; {year} Digital Life Initiative.</small></p>
+  </div>
+</footer>

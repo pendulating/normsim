@@ -1,0 +1,268 @@
+---
+/* A logged training curve for the step diagrams: one or more series of
+   [x, y] points from a run's trainer_state.json, drawn as 2px lines over
+   hairline gridlines. `tone` sets emphasis: 'accent' is the series the card is
+   about, 'ink' a second named series, 'muted' recessive context. Accent and
+   ink lines carry a card-colored ring and per-point hover readouts; muted
+   lines get a whole-line hover title. Lines draw in when the enclosing
+   [data-show-from] element or .td-view is revealed. A legend sits above the
+   plot; slot content (a note) and an optional table view follow it. */
+
+export interface CurveSeries {
+  name: string;
+  points: number[][];
+  tone: 'accent' | 'ink' | 'muted';
+  /** Hover text for the whole line (muted series). */
+  title?: string;
+  /** Text at the line's right end; a second line goes under it. */
+  end?: [string, string?];
+}
+
+interface Props {
+  label: string;
+  series: CurveSeries[];
+  x: { max: number; ticks: number[]; label: string };
+  y: { min: number; max: number; ticks: number[]; log?: boolean };
+  /** Name of the y value, for point hovers ("loss", "reward"). */
+  yName: string;
+  /** Format a y value for ticks and hovers. */
+  digits?: number;
+  /** Draw a stronger line at this y (the zero of a signed quantity). */
+  ref?: number;
+  /** Omit for a single series; the card title names it. */
+  legend?: { tone: CurveSeries['tone']; label: string }[];
+  table?: { head: string[]; rows: (string | number)[][] };
+}
+
+const { label, series, x, y, yName, digits = 2, ref, legend, table } = Astro.props;
+const plot = { w: 360, h: 196, l: 30, r: 78, t: 8, b: 24 };
+const f = (v: number) => (y.log ? Math.log(v) : v);
+const px = (v: number) => plot.l + (v / x.max) * (plot.w - plot.l - plot.r);
+const py = (v: number) => plot.t + ((f(y.max) - f(v)) / (f(y.max) - f(y.min))) * (plot.h - plot.t - plot.b);
+const d = (pts: number[][]) => pts.map(([a, b], i) => `${i ? 'L' : 'M'}${px(a).toFixed(1)} ${py(b).toFixed(1)}`).join('');
+const order = { muted: 0, ink: 1, accent: 2 };
+const drawn = [...series].sort((a, b) => order[a.tone] - order[b.tone]);
+const fmt = (v: number) => v.toFixed(digits);
+---
+
+{
+  legend && (
+    <p class="tc-legend">
+      {legend.map((k) => (
+        <span>
+          <span class={`tc-key tc-key-${k.tone}`} />
+          {k.label}
+        </span>
+      ))}
+    </p>
+  )
+}
+<svg class="tc" viewBox={`0 0 ${plot.w} ${plot.h}`} role="img" aria-label={label}>
+  {
+    y.ticks.map((v) => (
+      <Fragment>
+        <line class:list={['tc-grid', { 'tc-ref': v === ref }]} x1={plot.l} x2={plot.w - plot.r} y1={py(v)} y2={py(v)} />
+        <text class="tc-tick" x={plot.l - 5} y={py(v) + 3.5} text-anchor="end">{String(v).replace('-', '−')}</text>
+      </Fragment>
+    ))
+  }
+  {
+    x.ticks.map((v) => (
+      <text class="tc-tick" x={px(v)} y={plot.h - plot.b + 13} text-anchor="middle">{v}</text>
+    ))
+  }
+  <text class="tc-tick" x={plot.w - plot.r} y={plot.h - 1} text-anchor="end">{x.label}</text>
+  {
+    drawn.map((s) => (
+      <g class={`tc-series tc-${s.tone}`}>
+        {s.title && <title>{s.title}</title>}
+        {s.tone === 'muted' && <path class="tc-hit" d={d(s.points)} />}
+        {s.tone !== 'muted' && <path class="tc-ring" d={d(s.points)} pathLength="1" />}
+        <path class="tc-line" d={d(s.points)} pathLength="1" />
+        {s.tone !== 'muted' &&
+          s.points.map(([a, b]) => (
+            <circle class="tc-pt" cx={px(a)} cy={py(b)} r="6">
+              <title>{`${s.name}, ${x.label} ${a}: ${yName} ${fmt(b).replace('-', '−')}`}</title>
+            </circle>
+          ))}
+      </g>
+    ))
+  }
+  {
+    series
+      .filter((s) => s.end)
+      .map((s) => {
+        const [a, b] = s.points[s.points.length - 1];
+        return (
+          <Fragment>
+            <text class="tc-end" x={px(a) + 6} y={py(b) - 2}>{s.end![0]}</text>
+            {s.end![1] && (
+              <text class="tc-end tc-end-sub" x={px(a) + 6} y={py(b) + 11}>{s.end![1]}</text>
+            )}
+          </Fragment>
+        );
+      })
+  }
+</svg>
+<slot />
+{
+  table && (
+    <details class="tc-table">
+      <summary>Table</summary>
+      <table>
+        <thead>
+          <tr>{table.head.map((h) => <th>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {table.rows.map((r) => (
+            <tr>{r.map((c) => <td>{c}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
+  )
+}
+
+<style>
+  .tc-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.2rem 1rem;
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+  }
+  .tc-key {
+    display: inline-block;
+    width: 1rem;
+    height: 2px;
+    margin-right: 0.4rem;
+    vertical-align: middle;
+  }
+  .tc-key-accent {
+    background: rgb(var(--color-accent));
+  }
+  .tc-key-ink {
+    background: rgba(var(--color-text-base), 0.6);
+  }
+  .tc-key-muted {
+    background: var(--td-ink-soft);
+  }
+  .tc {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .tc-grid {
+    stroke: var(--td-ink-faint);
+    stroke-width: 1;
+  }
+  .tc-ref {
+    stroke: var(--td-ink-soft);
+  }
+  .tc-tick {
+    fill: rgb(var(--color-text-base));
+    font-size: 10px;
+    opacity: 0.65;
+    font-variant-numeric: tabular-nums;
+  }
+  .tc path {
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+  }
+  .tc-line,
+  .tc-ring {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 0;
+    pointer-events: none;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s;
+  }
+  .tc-ring {
+    stroke: rgb(var(--color-card));
+    stroke-width: 5;
+  }
+  .tc-line {
+    stroke-width: 2;
+  }
+  .tc-accent .tc-line {
+    stroke: rgb(var(--color-accent));
+  }
+  .tc-ink .tc-line {
+    stroke: rgba(var(--color-text-base), 0.6);
+  }
+  .tc-muted .tc-line {
+    stroke: rgba(var(--color-text-base), 0.3);
+    stroke-width: 1.25;
+    transition:
+      stroke-dashoffset 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.3s,
+      stroke 0.2s ease;
+  }
+  .tc-muted:hover .tc-line {
+    stroke: rgba(var(--color-text-base), 0.8);
+    stroke-width: 1.75;
+  }
+  .tc-hit {
+    stroke: transparent;
+    stroke-width: 10;
+    pointer-events: stroke;
+  }
+  .tc-pt {
+    fill: transparent;
+    stroke: transparent;
+  }
+  .tc-pt:hover {
+    fill: rgb(var(--color-card));
+    stroke-width: 2;
+  }
+  .tc-accent .tc-pt:hover {
+    stroke: rgb(var(--color-accent));
+  }
+  .tc-ink .tc-pt:hover {
+    stroke: rgba(var(--color-text-base), 0.8);
+  }
+  :global(.is-hidden) .tc :is(.tc-line, .tc-ring),
+  :global(.td-view:not(.is-on)) .tc :is(.tc-line, .tc-ring) {
+    stroke-dashoffset: 1;
+    transition: none;
+  }
+  .tc-end {
+    fill: rgb(var(--color-text-base));
+    font-size: 10.5px;
+    font-weight: 700;
+  }
+  .tc-end-sub {
+    font-weight: 500;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
+  }
+  .tc-table {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+  }
+  .tc-table summary {
+    cursor: pointer;
+    opacity: 0.75;
+  }
+  .tc-table table {
+    width: 100%;
+    margin-top: 0.4rem;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+  .tc-table th,
+  .tc-table td {
+    padding: 0.15rem 0.4rem;
+    border-bottom: 1px solid var(--td-ink-faint);
+    text-align: right;
+  }
+  .tc-table :is(th, td):first-child {
+    text-align: left;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tc-line,
+    .tc-ring {
+      transition: none;
+    }
+  }
+</style>
