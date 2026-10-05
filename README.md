@@ -8,7 +8,7 @@ to GitHub Pages from `main` by `.github/workflows/deploy.yml`.
 
 ```bash
 npm install
-npm run dev       # http://localhost:4321/normsite/
+npm run dev       # http://localhost:4321/normsim/
 npm run build     # static output in dist/
 npm run preview
 ```
@@ -66,7 +66,9 @@ The site follows `~/style/frontend-palette.md`:
 
 ## Deploying
 
-`astro.config.mjs` sets `site` to `https://pendulating.github.io` and `base` to
-`/normsite`. Enable GitHub Pages with the "GitHub Actions" source in the
-repository settings, and every push to `main` publishes. For a custom domain,
-set `base: '/'`, set `site` to the domain, and add a `public/CNAME`.
+The site is published at <https://mfranchi.net/normsim/>. GitHub Pages serves
+project repositories under the `pendulating.github.io` user site, whose custom
+domain is `mfranchi.net`, at a path equal to the repository name, so the
+repository must be named `normsim`. `astro.config.mjs` sets `site` to
+`https://mfranchi.net` and `base` to `/normsim` to match. Pages uses the
+"GitHub Actions" source, and every push to `main` publishes.

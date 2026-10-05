@@ -20,11 +20,11 @@ const dropRawScans = {
   },
 };
 
-// GitHub Pages serves this repository at https://pendulating.github.io/normsite/.
-// If you attach a custom domain, set `base` to '/' and `site` to that domain.
+// GitHub Pages serves this repository (pendulating/normsim) under the user site's custom
+// domain, so it lives at https://mfranchi.net/normsim/. `base` must match the repository name.
 export default defineConfig({
-  site: 'https://pendulating.github.io',
-  base: '/normsite',
+  site: 'https://mfranchi.net',
+  base: '/normsim',
   trailingSlash: 'ignore',
   integrations: [dropRawScans],
   vite: {
