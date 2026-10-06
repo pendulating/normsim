@@ -13,7 +13,7 @@ import { nav } from '../data/nav';
       >{paper.shortTitle}</a
     >
     <nav aria-label="Sections">
-      <ul class="m-0 flex list-none flex-wrap gap-3 p-0 sm:gap-4">
+      <ul class="m-0 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 leading-tight sm:gap-x-4">
         {
           nav.filter((item) => item.header !== false).map((item) => (
             <li>
