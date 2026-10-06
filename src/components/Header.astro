@@ -1,14 +1,7 @@
 ---
 import ThemeToggle from './ThemeToggle.astro';
 import { paper } from '../data/paper';
-
-const nav = [
-  { href: '#abstract', label: 'Abstract' },
-  { href: '#method', label: 'Method' },
-  { href: '#cite', label: 'Cite' },
-  { href: '#reading', label: 'Reading' },
-  { href: '#now', label: 'Now' },
-];
+import { nav } from '../data/nav';
 ---
 
 <header
@@ -22,7 +15,7 @@ const nav = [
     <nav aria-label="Sections">
       <ul class="m-0 flex list-none flex-wrap gap-3 p-0 sm:gap-4">
         {
-          nav.map((item) => (
+          nav.filter((item) => item.header !== false).map((item) => (
             <li>
               <a class="text-sm no-underline hover:underline sm:text-[0.95rem]" href={item.href}>
                 {item.label}

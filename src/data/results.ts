@@ -47,6 +47,13 @@ export const metrics: Metric[] = [
 ];
 
 /** Zero-shot (the instruct checkpoint) and SFT for the canonical model set. */
+/** Titles of the three result cards, shared with the table of contents. */
+export const cards = {
+  sft: 'Zero-shot vs. SFT, 11 task LLMs',
+  rl: 'Qwen3.5-9B through every stage',
+  grounding: 'Where grounding shows: held-out normative alignment',
+};
+
 export const zeroShotSft = {
   teacher: { model: 'Gemma-4-31B-it', cells: { gc_appl: {v: 87.4}, gc_comp: {v: 83.2}, pl_qa: {v: 92.6}, pl_leak: {self: true, v: 41.7}, pl_help: {self: true, v: 51.9}, cf_r: {v: 68.8}, ci_leak: {v: 25.5}, ci_util: {v: 86.7}, ci_net: {v: 0.61}, vlm_q7: {v: 68.7}, mmlu: {v: 87.1} } },
   models: [

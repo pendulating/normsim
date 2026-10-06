@@ -93,6 +93,56 @@ const normArtic = normForce + 1;
     </div>
   </div>
 
+  <!-- Step controls. -->
+  <div class="nu-controls">
+    <ol class="nu-stepper" aria-label="Diagram steps">
+      {
+        steps.map((s, i) => (
+          <li>
+            <button type="button" class="nu-step" data-goto={i} aria-current={i === last ? 'step' : undefined}>
+              {i + 1} · {s.label}
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+    <div class="nu-buttons">
+      <button type="button" class="nu-btn" data-prev aria-label="Previous step">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+      </button>
+      <button type="button" class="nu-btn" data-next aria-label="Next step">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+      </button>
+      <button type="button" class="nu-btn" data-replay aria-label="Replay the animation">
+        <svg viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M4 12a8 8 0 1 0 2.4-5.7"></path><path d="M4 4v4.5h4.5"></path></svg
+        >
+      </button>
+    </div>
+  </div>
+
+  <p class="nu-live" aria-live="polite">
+    {
+      steps.map((s, i) => (
+        <span data-caption={i} hidden={i !== last}>
+          <span class="nu-live-label">
+            Step {i + 1} of {steps.length}: {s.label}.
+          </span>{' '}
+          {mathParts(s.caption).map((part, j) => (
+            <Fragment>
+              {j > 0 && (
+                <span class="nu-math">
+                  𝒩<sub>b</sub>
+                </span>
+              )}
+              {part}
+            </Fragment>
+          ))}
+        </span>
+      ))
+    }
+  </p>
+
   <div class="nu-stage">
     <!-- The two universes. Empty (dashed, 𝒩_b = ∅) until the last step. -->
     <div class="nu-orbs nu-view" data-view-of="orbs">
@@ -335,56 +385,6 @@ const normArtic = normForce + 1;
       </div>
     </div>
   </div>
-
-  <!-- Step controls. -->
-  <div class="nu-controls">
-    <ol class="nu-stepper" aria-label="Diagram steps">
-      {
-        steps.map((s, i) => (
-          <li>
-            <button type="button" class="nu-step" data-goto={i} aria-current={i === last ? 'step' : undefined}>
-              {i + 1} · {s.label}
-            </button>
-          </li>
-        ))
-      }
-    </ol>
-    <div class="nu-buttons">
-      <button type="button" class="nu-btn" data-prev aria-label="Previous step">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
-      </button>
-      <button type="button" class="nu-btn" data-next aria-label="Next step">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
-      </button>
-      <button type="button" class="nu-btn" data-replay aria-label="Replay the animation">
-        <svg viewBox="0 0 24 24" aria-hidden="true"
-          ><path d="M4 12a8 8 0 1 0 2.4-5.7"></path><path d="M4 4v4.5h4.5"></path></svg
-        >
-      </button>
-    </div>
-  </div>
-
-  <p class="nu-live" aria-live="polite">
-    {
-      steps.map((s, i) => (
-        <span data-caption={i} hidden={i !== last}>
-          <span class="nu-live-label">
-            Step {i + 1} of {steps.length}: {s.label}.
-          </span>{' '}
-          {mathParts(s.caption).map((part, j) => (
-            <Fragment>
-              {j > 0 && (
-                <span class="nu-math">
-                  𝒩<sub>b</sub>
-                </span>
-              )}
-              {part}
-            </Fragment>
-          ))}
-        </span>
-      ))
-    }
-  </p>
 </div>
 
 <style>
@@ -504,12 +504,18 @@ const normArtic = normForce + 1;
   }
 
   /* ---------- Stage: orbs and bench share one grid cell ---------- */
+  /* Only the active view is in flow, so the stage is exactly as tall as
+     what is on show; the controls above it never move. */
   .nu-stage {
+    position: relative;
     display: grid;
-    margin-top: 1.75rem;
+    margin-top: 1.5rem;
+    overflow: clip;
+    overflow-clip-margin: 0.5rem;
   }
   .nu-view {
     grid-area: 1 / 1;
+    align-self: start;
     min-width: 0;
     opacity: 0;
     visibility: hidden;
@@ -526,12 +532,16 @@ const normArtic = normForce + 1;
     transform: none;
     transition-delay: 0.15s, 0.15s, 0s;
   }
+  .nu:not([data-view='orbs']) .nu-orbs,
+  .nu[data-view='orbs'] .nu-bench {
+    position: absolute;
+    inset: 0 0 auto;
+  }
 
   /* ---------- Orbs ---------- */
   .nu-orbs {
     display: grid;
     gap: 2rem;
-    align-self: center;
   }
   @media (min-width: 640px) {
     .nu-orbs {
@@ -690,8 +700,11 @@ const normArtic = normForce + 1;
     text-align: center;
     opacity: 0.8;
   }
+  /* Sized by the script to the panels on show, so a taller panel that has
+     slid away or is still ahead leaves no blank under the current one. */
   .nu-viewport {
-    overflow-x: clip;
+    overflow: clip;
+    overflow-clip-margin: 0.25rem;
   }
   .nu-track {
     display: grid;
@@ -1182,6 +1195,7 @@ const normArtic = normForce + 1;
     const replay = root.querySelector<HTMLButtonElement>('[data-replay]')!;
     // Step index -> view name, read from the step buttons' order in the data.
     const views = (root.dataset.views ?? '').split(' ');
+    const viewport = root.querySelector<HTMLElement>('.nu-viewport')!;
 
     let step = last;
     let timer: number | undefined;
@@ -1280,7 +1294,19 @@ const normArtic = normForce + 1;
       // when it reaches the end of the sequence.
       prev.setAttribute('aria-disabled', String(step === 0));
       next.setAttribute('aria-disabled', String(step === last));
+      fit();
       if (step === from + 1) fly(view);
+    }
+
+    /* Size the bench's viewport to the panels on show (the current one and,
+       on wide screens, the one before it beside it), so a taller panel that
+       has slid away or is still ahead leaves no blank under the current. */
+    function fit() {
+      const list = [...panels];
+      const at = list.findIndex((p) => p.dataset.state === 'current');
+      const shown = at < 0 ? [] : wide() ? list.slice(Math.max(0, at - 1), at + 1) : [list[at]];
+      const inner = Math.max(0, ...shown.map((p) => p.offsetHeight));
+      if (inner) viewport.style.height = `${inner}px`;
     }
 
     function stop() {
@@ -1341,6 +1367,12 @@ const normArtic = normForce + 1;
       } else return;
       e.preventDefault();
     });
+
+    if ('ResizeObserver' in window) {
+      const ro = new ResizeObserver(fit);
+      panels.forEach((p) => ro.observe(p));
+    }
+    window.matchMedia('(min-width: 900px)').addEventListener('change', fit);
 
     if (reduced() || !('IntersectionObserver' in window)) {
       render(last);

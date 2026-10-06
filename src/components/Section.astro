@@ -6,9 +6,13 @@ interface Props {
 const { id, title } = Astro.props;
 ---
 
-<section id={id} class="border-t border-skin-line py-10 sm:py-14">
+<!-- The divider sits inside the content column, like every rule within a
+     section, rather than spanning the viewport. -->
+<section id={id} class="pb-10 sm:pb-14">
   <div class="wrap-wide">
-    <h2 class="mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">{title}</h2>
-    <slot />
+    <div class="border-t border-skin-line pt-10 sm:pt-14">
+      <h2 class="mb-4 text-[clamp(1.5rem,1.2rem+1.2vw,2rem)]">{title}</h2>
+      <slot />
+    </div>
   </div>
 </section>

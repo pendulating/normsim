@@ -6,47 +6,45 @@ import GrpoDiagram from './GrpoDiagram.astro';
 import KtoDiagram from './KtoDiagram.astro';
 import ResultsFigure from './ResultsFigure.astro';
 import { methodIntro, stages } from '../data/method';
-import { figureCaption } from '../data/normUniverse';
 import { captions } from '../data/training';
 
 const train = [
-  { Diagram: SftDiagram, caption: captions.sft },
-  { Diagram: GrpoDiagram, caption: captions.grpo },
-  { Diagram: KtoDiagram, caption: captions.kto },
+  { key: 'sft', Diagram: SftDiagram, caption: captions.sft },
+  { key: 'grpo', Diagram: GrpoDiagram, caption: captions.grpo },
+  { key: 'kto', Diagram: KtoDiagram, caption: captions.kto },
 ];
 ---
 
 <Section id="method" title="How it works">
   <p class="max-w-[46rem]">{methodIntro}</p>
 
-  <h3 class="stage-head">
+  <h3 class="stage-head" id="method-extract">
     <small>{stages.extract.label}</small>
     {stages.extract.title}
   </h3>
   <p class="max-w-[46rem]">{stages.extract.lead}</p>
   <figure class="mt-6 mb-0">
     <NormUniverseDiagram />
-
   </figure>
 
-  <h3 class="stage-head">
+  <h3 class="stage-head" id="method-train">
     <small>{stages.train.label}</small>
     {stages.train.title}
   </h3>
   <p class="max-w-[46rem]">{stages.train.lead}</p>
   {
-    train.map(({ Diagram, caption }) => (
-      <figure class="train-fig">
-        <p class="train-phase">
-          <small>{caption.phase}</small> {caption.title}
-        </p>
+    train.map(({ key, Diagram, caption }) => (
+      <figure class="train-fig" id={`train-${key}`}>
+        <h4 class="train-phase">
+          <small>{caption.phase}</small>
+          {caption.title}
+        </h4>
         <Diagram />
-
       </figure>
     ))
   }
 
-  <h3 class="stage-head">
+  <h3 class="stage-head" id="method-evaluate">
     <small>{stages.evaluate.label}</small>
     {stages.evaluate.title}
   </h3>
@@ -57,6 +55,8 @@ const train = [
 </Section>
 
 <style>
+  /* Two levels of heading inside the section: a solid rule opens each Step,
+     a dashed rule opens each training Phase within Step 2. */
   .stage-head {
     margin: 3.5rem 0 1rem;
     padding-top: 1.25rem;
@@ -68,19 +68,21 @@ const train = [
     margin-bottom: 0.2rem;
   }
   .train-fig {
-    margin: 2.5rem 0 0;
+    margin: 2.75rem 0 0;
+    padding-top: 1.25rem;
+    border-top: 1px dashed rgba(var(--color-text-base), 0.22);
   }
   .train-fig + .train-fig {
-    margin-top: 3.5rem;
+    margin-top: 4.5rem;
   }
   .train-phase {
-    margin: 0 0 1.25rem;
-    font-family: var(--font-display);
-    font-size: 1.1rem;
-    font-weight: 700;
-    text-align: center;
+    margin: 0 0 1.75rem;
+    font-size: 1.15rem;
   }
   .train-phase small {
     display: block;
+    margin-bottom: 0.15rem;
+    color: rgb(var(--color-accent));
+    letter-spacing: 0.02em;
   }
 </style>

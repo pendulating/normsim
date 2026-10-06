@@ -13,9 +13,11 @@
    view can build up across consecutive steps; `data-focus="1 3"` lights an
    element on those steps, as on pipeline nodes.
 
-   Same motion contract as NormUniverseDiagram: autoplays once when scrolled
-   into view and holds on the final step; reduced motion and no-JS both show
-   the final step. Styles for slot content are :global but scoped under .td,
+   The stepper and caption sit above the stage, so the stage can take the
+   height of whatever is on show and only its bottom edge moves. Same motion
+   contract as NormUniverseDiagram: autoplays once when scrolled into view
+   and holds on the final step; reduced motion and no-JS both show the final
+   step. Styles for slot content are :global but scoped under .td,
    so the view primitives (.td-card, .td-pill, ...) are shared by all three. */
 
 export interface DiagramNode {
@@ -92,10 +94,6 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
     }
   </div>
 
-  <div class="td-stage">
-    <slot />
-  </div>
-
   <div class="td-controls">
     <ol class="td-stepper" aria-label={`${name}: steps`}>
       {
@@ -135,6 +133,10 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
       ))
     }
   </p>
+
+  <div class="td-stage">
+    <slot />
+  </div>
 </div>
 
 <style>
@@ -244,15 +246,18 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
   }
 
   /* ---------- Stage: all views share one grid cell ---------- */
+  /* Only the active view is in flow, so the stage is exactly as tall as what
+     is on show; the controls above it never move. */
   .td-stage {
+    position: relative;
     display: grid;
-    margin-top: 1.75rem;
+    margin-top: 1.5rem;
+    overflow: clip;
+    overflow-clip-margin: 0.5rem;
   }
-  /* Views share one cell, so the stage keeps the tallest view's height and
-     the controls never move; shorter views sit centred in it. */
   .td :global(.td-view) {
     grid-area: 1 / 1;
-    align-self: center;
+    align-self: start;
     min-width: 0;
     opacity: 0;
     visibility: hidden;
@@ -262,16 +267,9 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
       transform 0.6s var(--td-ease),
       visibility 0s linear 0.5s;
   }
-  /* Narrow: stacked panels make views very different heights, so only the
-     active view takes space and the stage follows it. */
-  @media (max-width: 899px) {
-    .td-stage {
-      position: relative;
-    }
-    .td :global(.td-view:not(.is-on)) {
-      position: absolute;
-      inset: 0 0 auto;
-    }
+  .td :global(.td-view:not(.is-on)) {
+    position: absolute;
+    inset: 0 0 auto;
   }
   .td :global(.td-view.is-on) {
     opacity: 1;
@@ -284,10 +282,18 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
       opacity 0.5s ease 0.25s,
       transform 0.6s var(--td-ease) 0.25s;
   }
+  /* Out of the flow while hidden, so it holds no space; it rejoins the flow
+     and fades in when its step arrives. */
   .td :global([data-show-from].is-hidden) {
+    position: absolute;
+    visibility: hidden;
     opacity: 0;
     transform: translateY(6px);
     transition: none;
+  }
+  /* ...and nor does a wrapper whose children are all still hidden. */
+  .td :global(.td-view :has(> [data-show-from].is-hidden):not(:has(> :not(.is-hidden)))) {
+    display: none;
   }
 
   /* ---------- View primitives, shared by the three diagrams ---------- */
@@ -450,7 +456,7 @@ const loopCols = loop ? `${2 * idx(loop.to) + 1} / ${2 * idx(loop.from) + 2}` : 
     align-items: center;
     justify-content: center;
     gap: 0.5rem 1rem;
-    margin-top: 1.75rem;
+    margin-top: 1.5rem;
   }
   .td-stepper {
     display: flex;

@@ -1,0 +1,342 @@
+---
+/* Table of contents fixed to the left edge of the viewport, full height, on
+   wide screens. A thin rail fills with page-scroll progress; beside it the
+   header's sections are listed with their sub-entries: the Method steps with
+   Step 2's phases and Step 3's result cards under them, the Cite section's
+   copy button, and the shelf's Books/Papers views (which drive the shelf's
+   own toggle and mirror its mode). The hero's resource buttons repeat at the
+   foot. The entry for the heading nearest above the viewport's centre line
+   grows and gains weight, and its ancestors lift; nothing is current while
+   the hero or footer is in view. Hidden where the gutter cannot hold it; the
+   header nav covers those widths. */
+import { nav, resources } from '../data/nav';
+import { stages } from '../data/method';
+import { captions } from '../data/training';
+import { paper } from '../data/paper';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+
+interface Entry {
+  label: string;
+  href?: string;
+  action?: string;
+  children?: Entry[];
+}
+const stepChildren: Record<string, Entry[]> = {
+  // Entries name their subject in a few words, so none wraps when it grows.
+  train: Object.entries(captions).map(([key, c]) => ({
+    href: `#train-${key}`,
+    label: `${c.phase} · ${{ sft: 'SFT', grpo: 'GRPO', kto: 'KTO' }[key] ?? c.title}`,
+  })),
+  evaluate: [
+    { href: '#results-bench', label: 'Benchmark results' },
+    { href: '#results-grounding', label: 'Normative grounding' },
+  ],
+};
+const subs: Record<string, Entry[]> = {
+  '#method': Object.entries(stages).map(([key, s]) => ({
+    href: `#method-${key}`,
+    label: `${s.label} · ${s.title}`,
+    children: stepChildren[key],
+  })),
+  '#cite': [{ label: 'Copy BibTeX', action: 'copy' }],
+  '#reading': [
+    { label: 'Books', action: 'books' },
+    { label: 'Papers', action: 'papers' },
+  ],
+};
+const tree: Entry[] = nav.map((item) => ({ ...item, children: subs[item.href] }));
+const links = [
+  { href: `${base}/${paper.links.pdf}`, label: resources.pdf },
+  { href: paper.links.code, label: resources.code },
+];
+---
+
+<nav class="toc" aria-label="On this page" data-toc>
+  <div class="toc-rail" aria-hidden="true">
+    <div class="toc-fill" data-toc-fill></div>
+  </div>
+  <div class="toc-body">
+    <ol>
+      {
+        tree.map((a) => (
+          <li>
+            <a href={a.href} data-toc-link>
+              {a.label}
+            </a>
+            {a.children && (
+              <ol>
+                {a.children.map((b) => (
+                  <li>
+                    {b.href ? (
+                      <a href={b.href} data-toc-link>
+                        {b.label}
+                      </a>
+                    ) : (
+                      <button type="button" class="toc-act" data-toc-action={b.action}>
+                        {b.label}
+                      </button>
+                    )}
+                    {b.children && (
+                      <ol>
+                        {b.children.map((c) => (
+                          <li>
+                            <a href={c.href} data-toc-link>
+                              {c.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </li>
+        ))
+      }
+    </ol>
+    <div class="toc-links">
+      {
+        links.map((l) => (
+          <a class="toc-btn" href={l.href}>
+            {l.label}
+          </a>
+        ))
+      }
+    </div>
+  </div>
+</nav>
+
+<style>
+  .toc {
+    display: none;
+  }
+  /* The column takes the side margin beside the 64rem content column, so it
+     appears once that margin can hold about 11rem and widens with the
+     viewport up to 18rem. */
+  @media (min-width: 1376px) {
+    .toc {
+      --toc-ease: cubic-bezier(0.22, 1, 0.36, 1);
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 40;
+      display: flex;
+      gap: 1rem;
+      width: min(18rem, calc((100vw - 64rem) / 2));
+      padding: calc(var(--header-height) + 2rem) 1rem 2rem 1.5rem;
+      font-size: 0.85rem;
+      line-height: 1.3;
+    }
+  }
+  .toc-rail {
+    flex: none;
+    align-self: stretch;
+    width: 2px;
+    border-radius: 1px;
+    background: rgba(var(--color-text-base), 0.16);
+    overflow: hidden;
+    transition: var(--theme-transition);
+  }
+  .toc-fill {
+    width: 100%;
+    height: 100%;
+    background: rgb(var(--color-text-base));
+    transform-origin: top;
+    transform: scaleY(0);
+    transition: var(--theme-transition);
+  }
+  /* The list at the top, the resource buttons pinned to the bottom. */
+  .toc-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .toc-body > ol {
+    flex: none;
+  }
+  .toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .toc-body > ol > li + li {
+    margin-top: 0.8rem;
+  }
+  .toc ol ol {
+    margin: 0.3rem 0 0 0.8rem;
+  }
+  .toc ol ol li + li {
+    margin-top: 0.25rem;
+  }
+  .toc a,
+  .toc-act {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: rgba(var(--color-text-base), 0.45);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    overflow: hidden;
+    text-align: left;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      var(--theme-transition),
+      font-size 0.3s var(--toc-ease);
+  }
+  .toc ol ol :is(a, .toc-act) {
+    font-size: 0.78rem;
+  }
+  .toc ol ol ol a {
+    font-size: 0.74rem;
+  }
+  .toc :is(a, .toc-act):hover {
+    color: rgb(var(--color-text-base));
+    text-decoration: none;
+  }
+  /* The entry whose heading is nearest above the viewport's centre line. */
+  .toc a[aria-current='true'] {
+    color: rgb(var(--color-text-base));
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .toc ol ol a[aria-current='true'] {
+    font-size: 0.9rem;
+  }
+  .toc ol ol ol a[aria-current='true'] {
+    font-size: 0.84rem;
+  }
+  /* Ancestors of the current entry, and the shelf view on show (only while
+     Reading is the current section; the shelf always has a mode). */
+  .toc a.is-within,
+  .toc li:has(> a[aria-current='true']) .toc-act[aria-pressed='true'] {
+    color: rgba(var(--color-text-base), 0.8);
+  }
+  .toc li:has(> a[aria-current='true']) .toc-act[aria-pressed='true'] {
+    font-weight: 700;
+  }
+  /* Resource buttons, as in the hero but sized for the column. */
+  .toc-links {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: auto;
+    padding-top: 1.5rem;
+  }
+  .toc a.toc-btn {
+    padding: 0.3rem 0.6rem;
+    border: 1.5px solid rgba(var(--color-text-base), 0.45);
+    border-radius: 0.4rem;
+    color: rgba(var(--color-text-base), 0.8);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.3;
+    white-space: normal;
+    overflow: visible;
+  }
+  .toc a.toc-btn:hover {
+    border-color: rgb(var(--color-text-base));
+    background: rgb(var(--color-card));
+    color: rgb(var(--color-text-base));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .toc a,
+    .toc-act,
+    .toc-rail,
+    .toc-fill {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-toc]').forEach((toc) => {
+    const links = [...toc.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')];
+    const fill = toc.querySelector<HTMLElement>('[data-toc-fill]')!;
+    const targets = links.map((a) => document.querySelector<HTMLElement>(a.hash));
+    const last = targets[targets.length - 1];
+    let current: HTMLAnchorElement | null = null;
+    let ticking = false;
+
+    const top = (el: HTMLElement) => el.getBoundingClientRect().top + window.scrollY;
+
+    /* The entry whose target starts nearest above the viewport's centre line
+       (the first of any that start level, as the result cards do side by
+       side); none while the hero or the footer holds that line. */
+    function pick(): HTMLAnchorElement | null {
+      const line = window.scrollY + window.innerHeight / 2;
+      if (last && line > top(last) + last.offsetHeight) return null;
+      let hit: HTMLAnchorElement | null = null;
+      let hitTop = -Infinity;
+      targets.forEach((t, i) => {
+        if (!t) return;
+        const y = top(t);
+        if (y <= line && y > hitTop + 1) {
+          hit = links[i];
+          hitTop = y;
+        }
+      });
+      return hit;
+    }
+
+    function update() {
+      ticking = false;
+      const doc = document.documentElement;
+      const range = doc.scrollHeight - window.innerHeight;
+      const progress = range > 0 ? Math.min(1, Math.max(0, window.scrollY / range)) : 0;
+      fill.style.transform = `scaleY(${progress.toFixed(4)})`;
+
+      const next = pick();
+      if (next === current) return;
+      current = next;
+      links.forEach((a) => {
+        if (a === next) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+        a.classList.remove('is-within');
+      });
+      for (let li = next?.closest('ol')?.closest('li'); li; li = li.parentElement?.closest('li')) {
+        li.querySelector<HTMLAnchorElement>(':scope > a')?.classList.add('is-within');
+      }
+    }
+
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      window.requestAnimationFrame(update);
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+
+    /* Sub-entry actions: Copy BibTeX presses the Cite section's own button;
+       Books/Papers press the shelf's mode buttons. Each scrolls to its section
+       so the result is in view. */
+    const shelf = document.querySelector<HTMLElement>('[data-shelf]');
+    const modeActs = [...toc.querySelectorAll<HTMLButtonElement>('[data-toc-action="books"], [data-toc-action="papers"]')];
+    toc.querySelectorAll<HTMLButtonElement>('[data-toc-action]').forEach((btn) =>
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.tocAction;
+        if (act === 'copy') {
+          document.querySelector('#cite')?.scrollIntoView();
+          document.getElementById('copy-bibtex')?.click();
+        } else if (shelf) {
+          document.querySelector('#reading')?.scrollIntoView();
+          shelf.querySelector<HTMLButtonElement>(`[data-mode-btn="${act}"]`)?.click();
+        }
+      }),
+    );
+    if (shelf) {
+      const sync = () => modeActs.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tocAction === shelf.dataset.mode)));
+      new MutationObserver(sync).observe(shelf, { attributes: true, attributeFilter: ['data-mode'] });
+      sync();
+    }
+  });
+</script>

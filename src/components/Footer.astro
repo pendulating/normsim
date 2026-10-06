@@ -8,13 +8,17 @@ const authors =
     : authorList[0];
 ---
 
-<footer class="themed border-t border-skin-line py-10 text-[0.95rem]">
-  <div class="wrap">
-    <p class="mb-3">{paper.funding}</p>
-    <p class="mb-3">
-      Questions and correspondence: <a href={`mailto:${paper.contact}`}>{paper.contact}</a>. Code, the evaluation zoo, and
-      the fiction10 corpus inspector are on <a href={paper.links.code}>GitHub</a>.
-    </p>
-    <p class="mb-0"><small>&copy; {year} Digital Life Initiative.</small></p>
+<footer class="themed pb-10 text-[0.95rem]">
+  <div class="wrap-wide">
+    <div class="border-t border-skin-line pt-10">
+      <div class="mx-auto max-w-[46rem]">
+        <p class="mb-3">{paper.funding}</p>
+        <p class="mb-3">
+        Questions and correspondence: <a href={`mailto:${paper.contact}`}>{paper.contact}</a>. Code, the evaluation zoo, and
+        the fiction10 corpus inspector are on <a href={paper.links.code}>GitHub</a>.
+        </p>
+        <p class="mb-0"><small>&copy; {year} Digital Life Initiative.</small></p>
+      </div>
+    </div>
   </div>
 </footer>

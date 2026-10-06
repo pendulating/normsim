@@ -10,7 +10,7 @@
    Encoding follows the paper's tables: a hollow marker is a run below the
    strict-format parse gate, a bold value is in the column's statistical tie
    set. Every panel carries a table view. No-JS readers get the first metric. */
-import { metrics, zeroShotSft, rlStage, grounding, type Cell, type Metric } from '../data/results';
+import { metrics, zeroShotSft, rlStage, grounding, cards, type Cell, type Metric } from '../data/results';
 
 const first = metrics[0].key;
 const has = (c: Cell) => c.v != null;
@@ -84,323 +84,327 @@ const k3 = (v: number) => v.toFixed(3).replace('-', '−');
 ---
 
 <div class="rs" data-rs>
-  <div class="rs-tabs" role="group" aria-label="Benchmark metric">
+  <div class="rs-bench" id="results-bench">
+    <div class="rs-tabs" role="group" aria-label="Benchmark metric">
+      {
+        benches.map((b) => (
+          <div class="rs-tab-group">
+            <span class="rs-tab-bench">{b}</span>
+            <span class="rs-tab-row">
+              {metrics
+                .filter((m) => m.bench === b)
+                .map((m) => (
+                  <button type="button" class="rs-tab" data-metric={m.key} aria-pressed={m.key === first ? 'true' : 'false'}>
+                    {m.name}
+                    {m.lower && <span class="rs-down"> ↓</span>}
+                  </button>
+                ))}
+            </span>
+          </div>
+        ))
+      }
+    </div>
+
     {
-      benches.map((b) => (
-        <div class="rs-tab-group">
-          <span class="rs-tab-bench">{b}</span>
-          <span class="rs-tab-row">
-            {metrics
-              .filter((m) => m.bench === b)
-              .map((m) => (
-                <button type="button" class="rs-tab" data-metric={m.key} aria-pressed={m.key === first ? 'true' : 'false'}>
-                  {m.name}
-                  {m.lower && <span class="rs-down"> ↓</span>}
-                </button>
-              ))}
-          </span>
-        </div>
+      panels.map(({ m }) => (
+        <p class:list={['rs-metric', { 'is-on': m.key === first }]} data-panel={m.key}>
+          <b>
+            {m.bench} · {m.name}
+          </b>{' '}
+          {m.detail}. {m.lower ? 'Lower is better.' : 'Higher is better.'}
+        </p>
       ))
     }
-  </div>
 
-  {
-    panels.map(({ m }) => (
-      <p class:list={['rs-metric', { 'is-on': m.key === first }]} data-panel={m.key}>
-        <b>
-          {m.bench} · {m.name}
-        </b>{' '}
-        {m.detail}. {m.lower ? 'Lower is better.' : 'Higher is better.'}
-      </p>
-    ))
-  }
-
-  <div class="rs-cards">
-    <!-- A. Zero-shot vs. SFT. -->
-    <section class="rs-card" aria-label="Zero-shot versus SFT">
-      <header class="rs-head">
-        <h4>Zero-shot vs. SFT, 11 task LLMs</h4>
-        <span class="rs-meta">each model’s instruct checkpoint, then its SFT adapter</span>
-      </header>
-      <p class="rs-legend">
-        <span><span class="rs-key rs-key-ref"></span>zero-shot</span>
-        <span><span class="rs-key rs-key-sft"></span>SFT</span>
-        <span><span class="rs-key rs-key-gate"></span>below the parse gate</span>
-        <span><span class="rs-key-line"></span>Gemma-4-31B-it teacher</span>
-      </p>
-      {
-        panels.map(({ m, ax, fmt, shift, gated, teacher }) => (
-          <div class:list={['rs-panel', { 'is-on': m.key === first }]} data-panel={m.key}>
-            <div class="rs-plot" style={`grid-template-rows: repeat(${zeroShotSft.models.length}, auto) auto`}>
-              <div class="rs-grid" style={`grid-row: 1 / ${zeroShotSft.models.length + 1}`} aria-hidden="true">
-                {ax.ticks.map((t) => (
-                  <span class="rs-gridline" style={`left:${ax.at(t)}`} />
-                ))}
-                {has(teacher) && <span class="rs-refline" style={`left:${ax.at(teacher.v!)}`} />}
-              </div>
-              {zeroShotSft.models.map((r) => {
-                const z = r.zeroShot[m.key];
-                const s = r.sft[m.key];
-                const both = has(z) && has(s);
-                return (
-                  <Fragment>
-                    <span class="rs-label">{r.model}</span>
-                    <span class="rs-track">
-                      {both && (
-                        <span
-                          class="rs-span"
-                          style={`left:${ax.at(Math.min(z.v!, s.v!))}; right:calc(100% - ${ax.at(Math.max(z.v!, s.v!))})`}
-                        />
-                      )}
-                      {has(z) && (
-                        <span
-                          class:list={['rs-dot rs-dot-ref', { 'is-gate': z.gate }]}
-                          style={`left:${ax.at(z.v!)}`}
-                          title={`${r.model}, zero-shot: ${fmt(z.v!)}${z.gate ? ' (below the parse gate)' : ''}`}
-                        />
-                      )}
-                      {has(s) && (
-                        <span
-                          class:list={['rs-dot rs-dot-sft', { 'is-gate': s.gate }]}
-                          style={`left:${ax.at(s.v!)}`}
-                          title={`${r.model}, SFT: ${fmt(s.v!)}${s.gate ? ' (below the parse gate)' : ''}`}
-                        />
-                      )}
-                      {!has(s) && <span class="rs-status">SFT {statusText[s.status!]}</span>}
-                    </span>
-                    <span class="rs-vals">
-                      <span class="rs-from">
-                        <span class:list={{ 'rs-tie': z.bold }}>{has(z) ? `${fmt(z.v!)}${z.gate ? '×' : ''}` : '–'}</span>
-                        <span class="rs-arrow">→</span>
-                      </span>
-                      <span class:list={{ 'rs-tie': s.bold }}>{has(s) ? `${fmt(s.v!)}${s.gate ? '×' : ''}` : '–'}</span>
-                    </span>
-                  </Fragment>
-                );
-              })}
-              <span />
-              <span class="rs-axis" aria-hidden="true">
-                {ax.ticks.map((t, i) => (
-                  <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${ax.at(t)}`}>
-                    {fmt(t).replace(/\.0$/, '')}
-                  </span>
-                ))}
-              </span>
-              <span />
-            </div>
-            <p class="rs-note">
-              {`After SFT, ${shift.up} ${shift.up === 1 ? 'model improves' : 'models improve'}, ${shift.down} ${shift.down === 1 ? 'declines' : 'decline'}${shift.same > 0 ? `, ${shift.same} unchanged` : ''}.`}
-              {gated > 0 && ` ${gated} of the ${zeroShotSft.models.length * 2} runs fell below the parse gate (×), so those scores describe output that mostly failed to parse.`}
-              {has(teacher) && ` Dashed line: the teacher at ${fmt(teacher.v!)}${teacher.self ? ', self-judged' : ''}.`}
-            </p>
-            <details class="rs-table">
-              <summary>Table</summary>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Model</th>
-                    <th>Zero-shot</th>
-                    <th>SFT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {zeroShotSft.models.map((r) => (
-                    <tr>
-                      <td>{r.model}</td>
-                      {[r.zeroShot[m.key], r.sft[m.key]].map((c) => (
-                        <td class:list={{ 'rs-tie': c.bold }}>
-                          {has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : statusText[c.status!]}
-                        </td>
-                      ))}
-                    </tr>
+    <div class="rs-cards">
+      <!-- A. Zero-shot vs. SFT. -->
+      <section class="rs-card" id="results-sft" aria-label="Zero-shot versus SFT">
+        <header class="rs-head">
+          <h4>{cards.sft}</h4>
+          <span class="rs-meta">each model’s instruct checkpoint, then its SFT adapter</span>
+        </header>
+        <p class="rs-legend">
+          <span><span class="rs-key rs-key-ref"></span>zero-shot</span>
+          <span><span class="rs-key rs-key-sft"></span>SFT</span>
+          <span><span class="rs-key rs-key-gate"></span>below the parse gate</span>
+          <span><span class="rs-key-line"></span>Gemma-4-31B-it teacher</span>
+        </p>
+        {
+          panels.map(({ m, ax, fmt, shift, gated, teacher }) => (
+            <div class:list={['rs-panel', { 'is-on': m.key === first }]} data-panel={m.key}>
+              <div class="rs-plot" style={`grid-template-rows: repeat(${zeroShotSft.models.length}, auto) auto`}>
+                <div class="rs-grid" style={`grid-row: 1 / ${zeroShotSft.models.length + 1}`} aria-hidden="true">
+                  {ax.ticks.map((t) => (
+                    <span class="rs-gridline" style={`left:${ax.at(t)}`} />
                   ))}
-                </tbody>
-              </table>
-            </details>
-          </div>
-        ))
-      }
-    </section>
-
-    <!-- B. Qwen3.5-9B through every stage. -->
-    <section class="rs-card" aria-label="Qwen3.5-9B through every stage">
-      <header class="rs-head">
-        <h4>Qwen3.5-9B through every stage</h4>
-        <span class="rs-meta">every arm trains from the same merged SFT base</span>
-      </header>
-      <p class="rs-legend">
-        <span><span class="rs-key rs-key-sft"></span>reported GRPO and KTO models</span>
-        <span><span class="rs-key rs-key-ink"></span>other arms</span>
-        <span><span class="rs-key-line"></span>SFT base</span>
-      </p>
-      {
-        panels.map(({ m, ax, fmt, base }) => (
-          <div class:list={['rs-panel', { 'is-on': m.key === first }]} data-panel={m.key}>
-            <div class="rs-plot" style={`grid-template-rows: repeat(${rlRows}, auto) auto`}>
-              <div class="rs-grid" style={`grid-row: 1 / ${rlRows + 1}`} aria-hidden="true">
-                {ax.ticks.map((t) => (
-                  <span class="rs-gridline" style={`left:${ax.at(t)}`} />
-                ))}
-                {has(base) && <span class="rs-refline" style={`left:${ax.at(base.v!)}`} />}
+                  {has(teacher) && <span class="rs-refline" style={`left:${ax.at(teacher.v!)}`} />}
+                </div>
+                {zeroShotSft.models.map((r) => {
+                  const z = r.zeroShot[m.key];
+                  const s = r.sft[m.key];
+                  const both = has(z) && has(s);
+                  return (
+                    <Fragment>
+                      <span class="rs-label">{r.model}</span>
+                      <span class="rs-track">
+                        {both && (
+                          <span
+                            class="rs-span"
+                            style={`left:${ax.at(Math.min(z.v!, s.v!))}; right:calc(100% - ${ax.at(Math.max(z.v!, s.v!))})`}
+                          />
+                        )}
+                        {has(z) && (
+                          <span
+                            class:list={['rs-dot rs-dot-ref', { 'is-gate': z.gate }]}
+                            style={`left:${ax.at(z.v!)}`}
+                            title={`${r.model}, zero-shot: ${fmt(z.v!)}${z.gate ? ' (below the parse gate)' : ''}`}
+                          />
+                        )}
+                        {has(s) && (
+                          <span
+                            class:list={['rs-dot rs-dot-sft', { 'is-gate': s.gate }]}
+                            style={`left:${ax.at(s.v!)}`}
+                            title={`${r.model}, SFT: ${fmt(s.v!)}${s.gate ? ' (below the parse gate)' : ''}`}
+                          />
+                        )}
+                        {!has(s) && <span class="rs-status">SFT {statusText[s.status!]}</span>}
+                      </span>
+                      <span class="rs-vals">
+                        <span class="rs-from">
+                          <span class:list={{ 'rs-tie': z.bold }}>{has(z) ? `${fmt(z.v!)}${z.gate ? '×' : ''}` : '–'}</span>
+                          <span class="rs-arrow">→</span>
+                        </span>
+                        <span class:list={{ 'rs-tie': s.bold }}>{has(s) ? `${fmt(s.v!)}${s.gate ? '×' : ''}` : '–'}</span>
+                      </span>
+                    </Fragment>
+                  );
+                })}
+                <span />
+                <span class="rs-axis" aria-hidden="true">
+                  {ax.ticks.map((t, i) => (
+                    <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${ax.at(t)}`}>
+                      {fmt(t).replace(/\.0$/, '')}
+                    </span>
+                  ))}
+                </span>
+                <span />
               </div>
-              {rlGroups.map((g) => (
-                <Fragment>
-                  {g.label && <span class="rs-group">{g.label}</span>}
-                  {g.rows.map((r) => {
-                    const c = r.cells[m.key];
-                    return (
-                      <Fragment>
-                        <span class:list={['rs-label', { 'rs-label-strong': r.kind === 'reported' }]}>{r.arm}</span>
-                        <span class="rs-track">
-                          {has(c) && (
-                            <span
-                              class:list={[
-                                'rs-dot',
-                                r.kind === 'reported' ? 'rs-dot-sft' : r.kind === 'ref' ? 'rs-dot-ref' : 'rs-dot-ink',
-                                { 'is-gate': c.gate },
-                              ]}
-                              style={`left:${ax.at(c.v!)}`}
-                              title={`${r.arm}: ${fmt(c.v!)}${c.gate ? ' (below the parse gate)' : ''}`}
-                            />
-                          )}
-                        </span>
-                        <span class="rs-vals">
-                          <span class:list={{ 'rs-tie': c.bold }}>{has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : '–'}</span>
-                        </span>
-                      </Fragment>
-                    );
-                  })}
-                </Fragment>
-              ))}
-              <span />
-              <span class="rs-axis" aria-hidden="true">
-                {ax.ticks.map((t, i) => (
-                  <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${ax.at(t)}`}>
-                    {fmt(t).replace(/\.0$/, '')}
-                  </span>
-                ))}
-              </span>
-              <span />
-            </div>
-            <details class="rs-table">
-              <summary>Table</summary>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Arm</th>
-                    <th>{m.name}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rlStage.map((r) => {
-                    const c = r.cells[m.key];
-                    return (
+              <p class="rs-note">
+                {`After SFT, ${shift.up} ${shift.up === 1 ? 'model improves' : 'models improve'}, ${shift.down} ${shift.down === 1 ? 'declines' : 'decline'}${shift.same > 0 ? `, ${shift.same} unchanged` : ''}.`}
+                {gated > 0 && ` ${gated} of the ${zeroShotSft.models.length * 2} runs fell below the parse gate (×), so those scores describe output that mostly failed to parse.`}
+                {has(teacher) && ` Dashed line: the teacher at ${fmt(teacher.v!)}${teacher.self ? ', self-judged' : ''}.`}
+              </p>
+              <details class="rs-table">
+                <summary>Table</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>Zero-shot</th>
+                      <th>SFT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {zeroShotSft.models.map((r) => (
                       <tr>
-                        <td>{r.arm}</td>
-                        <td class:list={{ 'rs-tie': c.bold }}>{has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : statusText[c.status!]}</td>
+                        <td>{r.model}</td>
+                        {[r.zeroShot[m.key], r.sft[m.key]].map((c) => (
+                          <td class:list={{ 'rs-tie': c.bold }}>
+                            {has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : statusText[c.status!]}
+                          </td>
+                        ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </details>
-          </div>
-        ))
-      }
-      <p class="rs-note">
-        Same axis as the card above. On PrivacyLens, the one benchmark where we measure re-run noise directly,
-        six sampling seeds move QA accuracy by ±2.4–2.7 points, adjusted leakage by ±1.6–2.2, and helpfulness by
-        ±1.5–1.9. Neither the reward components nor the kind of preference label moves a benchmark beyond that noise. 
-      </p>
-    </section>
+                    ))}
+                  </tbody>
+                </table>
+              </details>
+            </div>
+          ))
+        }
+      </section>
+
+      <!-- B. Qwen3.5-9B through every stage. -->
+      <section class="rs-card" id="results-rl" aria-label="Qwen3.5-9B through every stage">
+        <header class="rs-head">
+          <h4>{cards.rl}</h4>
+          <span class="rs-meta">every arm trains from the same merged SFT base</span>
+        </header>
+        <p class="rs-legend">
+          <span><span class="rs-key rs-key-sft"></span>reported GRPO and KTO models</span>
+          <span><span class="rs-key rs-key-ink"></span>other arms</span>
+          <span><span class="rs-key-line"></span>SFT base</span>
+        </p>
+        {
+          panels.map(({ m, ax, fmt, base }) => (
+            <div class:list={['rs-panel', { 'is-on': m.key === first }]} data-panel={m.key}>
+              <div class="rs-plot" style={`grid-template-rows: repeat(${rlRows}, auto) auto`}>
+                <div class="rs-grid" style={`grid-row: 1 / ${rlRows + 1}`} aria-hidden="true">
+                  {ax.ticks.map((t) => (
+                    <span class="rs-gridline" style={`left:${ax.at(t)}`} />
+                  ))}
+                  {has(base) && <span class="rs-refline" style={`left:${ax.at(base.v!)}`} />}
+                </div>
+                {rlGroups.map((g) => (
+                  <Fragment>
+                    {g.label && <span class="rs-group">{g.label}</span>}
+                    {g.rows.map((r) => {
+                      const c = r.cells[m.key];
+                      return (
+                        <Fragment>
+                          <span class:list={['rs-label', { 'rs-label-strong': r.kind === 'reported' }]}>{r.arm}</span>
+                          <span class="rs-track">
+                            {has(c) && (
+                              <span
+                                class:list={[
+                                  'rs-dot',
+                                  r.kind === 'reported' ? 'rs-dot-sft' : r.kind === 'ref' ? 'rs-dot-ref' : 'rs-dot-ink',
+                                  { 'is-gate': c.gate },
+                                ]}
+                                style={`left:${ax.at(c.v!)}`}
+                                title={`${r.arm}: ${fmt(c.v!)}${c.gate ? ' (below the parse gate)' : ''}`}
+                              />
+                            )}
+                          </span>
+                          <span class="rs-vals">
+                            <span class:list={{ 'rs-tie': c.bold }}>{has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : '–'}</span>
+                          </span>
+                        </Fragment>
+                      );
+                    })}
+                  </Fragment>
+                ))}
+                <span />
+                <span class="rs-axis" aria-hidden="true">
+                  {ax.ticks.map((t, i) => (
+                    <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${ax.at(t)}`}>
+                      {fmt(t).replace(/\.0$/, '')}
+                    </span>
+                  ))}
+                </span>
+                <span />
+              </div>
+              <details class="rs-table">
+                <summary>Table</summary>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Arm</th>
+                      <th>{m.name}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rlStage.map((r) => {
+                      const c = r.cells[m.key];
+                      return (
+                        <tr>
+                          <td>{r.arm}</td>
+                          <td class:list={{ 'rs-tie': c.bold }}>{has(c) ? `${fmt(c.v!)}${c.gate ? '×' : ''}` : statusText[c.status!]}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </details>
+            </div>
+          ))
+        }
+        <p class="rs-note">
+          Same axis as the card above. On PrivacyLens, the one benchmark where we measure re-run noise directly,
+          six sampling seeds move QA accuracy by ±2.4–2.7 points, adjusted leakage by ±1.6–2.2, and helpfulness by
+          ±1.5–1.9. Neither the reward components nor the kind of preference label moves a benchmark beyond that noise. 
+        </p>
+      </section>
+    </div>
+
+    <p class="rs-foot">
+      Values are percentages except CI-RL net score (−1 to 1) and κ. <b>Bold</b> values are the paper’s statistical tie
+      set: re-run noise cannot separate them from the best value in their table’s column. × marks a run below the
+      benchmark’s 70% strict-format parse gate. All judged metrics use Gemma-4-31B-it.
+    </p>
   </div>
 
   <!-- C. Held-out normative alignment. -->
-  <section class="rs-card rs-ground" aria-label="Held-out normative alignment">
-    <header class="rs-head">
-      <h4>Where grounding shows: held-out normative alignment</h4>
-      <span class="rs-meta">503 chunks unseen by both RL arms</span>
-    </header>
-    <p class="rs-lead">
-      Each model re-runs the extraction and labels each flow itself, with no norm in context. κ measures how far that
-      label agrees with the label grounded in the novel’s own norms, beyond chance within each novel.
-    </p>
-    <div class="rs-plot" style={`grid-template-rows: repeat(${grounding.length}, auto) auto`}>
-      <div class="rs-grid" style={`grid-row: 1 / ${grounding.length + 1}`} aria-hidden="true">
-        {gAxis.ticks.map((t) => <span class:list={['rs-gridline', { 'rs-zero': t === 0 }]} style={`left:${gAt(t)}`} />)}
-      </div>
-      {
-        grounding.map((g) => (
-          <Fragment>
-            <span class:list={['rs-label', { 'rs-label-strong': g.kind === 'reported' }]}>{g.extractor}</span>
-            <span class="rs-track">
-              <span class="rs-whisker" style={`left:${gAt(g.ci[0])}; right:calc(100% - ${gAt(g.ci[1])})`} />
-              <span
-                class:list={[
-                  'rs-dot',
-                  g.kind === 'reported' ? 'rs-dot-sft' : g.kind === 'ref' || g.kind === 'teacher' ? 'rs-dot-ref' : 'rs-dot-ink',
-                ]}
-                style={`left:${gAt(g.kappa)}`}
-                title={`${g.extractor}: κ ${k3(g.kappa)} [${k3(g.ci[0])}, ${k3(g.ci[1])}]`}
-              />
-            </span>
-            <span class="rs-vals">
-              <span class:list={{ 'rs-tie': g.bold }}>{k3(g.kappa)}</span>
-            </span>
-          </Fragment>
-        ))
-      }
-      <span />
-      <span class="rs-axis" aria-hidden="true">
+  <div class="rs-ground-wrap">
+    <section class="rs-card rs-ground" id="results-grounding" aria-label="Held-out normative alignment">
+      <header class="rs-head">
+        <h4>{cards.grounding}</h4>
+        <span class="rs-meta">503 chunks unseen by both RL arms</span>
+      </header>
+      <p class="rs-lead">
+        Each model re-runs the extraction and labels each flow itself, with no norm in context. κ measures how far that
+        label agrees with the label grounded in the novel’s own norms, beyond chance within each novel.
+      </p>
+      <div class="rs-plot" style={`grid-template-rows: repeat(${grounding.length}, auto) auto`}>
+        <div class="rs-grid" style={`grid-row: 1 / ${grounding.length + 1}`} aria-hidden="true">
+          {gAxis.ticks.map((t) => <span class:list={['rs-gridline', { 'rs-zero': t === 0 }]} style={`left:${gAt(t)}`} />)}
+        </div>
         {
-          gAxis.ticks.map((t, i) => (
-            <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${gAt(t)}`}>
-              {t === 0 ? '0' : t.toFixed(2)}
-            </span>
+          grounding.map((g) => (
+            <Fragment>
+              <span class:list={['rs-label', { 'rs-label-strong': g.kind === 'reported' }]}>{g.extractor}</span>
+              <span class="rs-track">
+                <span class="rs-whisker" style={`left:${gAt(g.ci[0])}; right:calc(100% - ${gAt(g.ci[1])})`} />
+                <span
+                  class:list={[
+                    'rs-dot',
+                    g.kind === 'reported' ? 'rs-dot-sft' : g.kind === 'ref' || g.kind === 'teacher' ? 'rs-dot-ref' : 'rs-dot-ink',
+                  ]}
+                  style={`left:${gAt(g.kappa)}`}
+                  title={`${g.extractor}: κ ${k3(g.kappa)} [${k3(g.ci[0])}, ${k3(g.ci[1])}]`}
+                />
+              </span>
+              <span class="rs-vals">
+                <span class:list={{ 'rs-tie': g.bold }}>{k3(g.kappa)}</span>
+              </span>
+            </Fragment>
           ))
         }
-      </span>
-      <span />
-    </div>
-    <p class="rs-note">
-      Cohen’s κ with 95% bootstrap intervals that resample whole novels (10 books, so read them as coarse). SFT trained on
-      every chunk and only imitates the teacher’s ungrounded labels; GRPO and KTO roughly double its alignment on text
-      neither saw.
-    </p>
-    <details class="rs-table">
-      <summary>Table</summary>
-      <table>
-        <thead>
-          <tr>
-            <th>Extractor</th>
-            <th>Flows</th>
-            <th>κ</th>
-            <th>95% CI</th>
-          </tr>
-        </thead>
-        <tbody>
+        <span />
+        <span class="rs-axis" aria-hidden="true">
           {
-            grounding.map((g) => (
-              <tr>
-                <td>{g.extractor}</td>
-                <td>{g.flows.toLocaleString('en-US')}</td>
-                <td class:list={{ 'rs-tie': g.bold }}>{k3(g.kappa)}</td>
-                <td>
-                  [{k3(g.ci[0])}, {k3(g.ci[1])}]
-                </td>
-              </tr>
+            gAxis.ticks.map((t, i) => (
+              <span class:list={{ 'rs-tick-odd': i % 2 === 1 }} style={`left:${gAt(t)}`}>
+                {t === 0 ? '0' : t.toFixed(2)}
+              </span>
             ))
           }
-        </tbody>
-      </table>
-    </details>
-  </section>
-
-  <p class="rs-foot">
-    Values are percentages except CI-RL net score (−1 to 1) and κ. <b>Bold</b> values are the paper’s statistical tie
-    set: re-run noise cannot separate them from the best value in their table’s column. × marks a run below the
-    benchmark’s 70% strict-format parse gate. All judged metrics use Gemma-4-31B-it.
-  </p>
+        </span>
+        <span />
+      </div>
+      <p class="rs-note">
+        Cohen’s κ with 95% bootstrap intervals that resample whole novels (10 books, so read them as coarse). SFT trained on
+        every chunk and only imitates the teacher’s ungrounded labels; GRPO and KTO roughly double its alignment on text
+        neither saw.
+      </p>
+      <details class="rs-table">
+        <summary>Table</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Extractor</th>
+              <th>Flows</th>
+              <th>κ</th>
+              <th>95% CI</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              grounding.map((g) => (
+                <tr>
+                  <td>{g.extractor}</td>
+                  <td>{g.flows.toLocaleString('en-US')}</td>
+                  <td class:list={{ 'rs-tie': g.bold }}>{k3(g.kappa)}</td>
+                  <td>
+                    [{k3(g.ci[0])}, {k3(g.ci[1])}]
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </details>
+    </section>
+  </div>
 </div>
 
 <script>
@@ -504,7 +508,14 @@ const k3 = (v: number) => v.toFixed(3).replace('-', '−');
   }
   .rs-ground {
     max-width: 40rem;
-    margin: 1rem auto 0;
+    margin: 0 auto;
+  }
+  /* The grounding card is independent of the metric buttons, so it sits under
+     its own rule rather than reading as a third benchmark panel. */
+  .rs-ground-wrap {
+    margin-top: 2.75rem;
+    padding-top: 2rem;
+    border-top: 1px dashed rgba(var(--color-text-base), 0.22);
   }
   .rs-ground .rs-plot {
     grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) 4rem;
@@ -706,7 +717,7 @@ const k3 = (v: number) => v.toFixed(3).replace('-', '−');
   }
   .rs-foot {
     max-width: 46rem;
-    margin: 1rem auto 0;
+    margin: 1.1rem auto 0;
     font-size: 0.8rem;
     text-align: center;
     opacity: 0.75;

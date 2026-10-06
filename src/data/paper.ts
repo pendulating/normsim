@@ -34,5 +34,5 @@ export const paper = {
   year      = {2026}
 }`,
   funding:
-    'The authors were supported by a gift from Google DeepMind to the Digital Life Initiative and a DLI Doctoral Fellowship. All source texts are in the public domain via Project Gutenberg. The normative simulacra represent what these texts depict, not endorsements of any moral framework.',
+    'The authors were supported by a gift from Google DeepMind to the Digital Life Initiative and a DLI Doctoral Fellowship. All source texts are available via Project Gutenberg.',
 } as const;
