@@ -45,7 +45,7 @@ export const sft = {
       view: 'train',
     },
     {
-      label: 'What SFT leaves open',
+      label: 'SFT Limitations',
       caption:
         'SFT elicits CI-structured output, but its appropriateness judgments come from the weights alone. On 1,200 teacher flows, the labels SFT trains on agree with the norm-derived label on only 10% of inappropriate flows, a macro agreement below what a blanket label earns. The merged SFT checkpoint is the starting point for both arms below.',
       focus: ['policy'],

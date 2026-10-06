@@ -84,7 +84,7 @@ const series: CurveSeries[] = [
         </div>
         <p class="td-note">
           Flow {ex.flowIndex + 1} of {ex.flowsTotal} in this target; the label is the teacher’s own, made with no norm in
-          context. {sft.pairs.total.toLocaleString('en-US')} pairs in all ({sft.pairs.negative} negative).
+          context.
         </p>
       </section>
     </div>
@@ -146,7 +146,7 @@ const series: CurveSeries[] = [
           {sft.hyper.map((h) => <span class="td-pill">{h}</span>)}
         </p>
         <p class="td-note">
-          11 task LLMs from 2B to 20B parameters. Both Phase 2 arms train Qwen3.5-9B from its merged SFT checkpoint.
+          11 task LLMs from 2B to 20B parameters. Both RL arms train on Qwen3.5-9B's SFT checkpoint.
         </p>
       </div>
     </div>
@@ -198,7 +198,7 @@ const series: CurveSeries[] = [
       </div>
       <p class="td-note">
         Dashed line: the 50% macro agreement a blanket label earns. Judging from weights alone, the labels SFT learns fall
-        below it. SFT teaches the form of a CI judgment; Phase 2 makes the judgment answer to the text’s norms.
+        below it. SFT teaches the form of a CI judgment; RL aims to make the judgment answer to the text’s norms.
       </p>
     </div>
     </div>

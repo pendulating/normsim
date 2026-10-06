@@ -8,20 +8,20 @@ export const stages = {
   extract: {
     label: 'Step 1',
     title: 'Extract',
-    lead: 'An extraction teacher (Gemma-4-31B-it) reads ten public-domain novels from Project Gutenberg and records two kinds of structure: descriptive information flows, which say who passed what about whom and on what terms, and prescriptive norms, which say what the society expects. Keeping the two apart is what makes grounding checkable later. The corpus yields 16,200 flows and 10,034 norms, gathered book by book into normative universes.',
+    lead: 'An extraction teacher (Gemma-4-31B-it) parses ten novels from Project Gutenberg and identifies (1) descriptive information flows, which say who passed what about whom and on what terms, and (2) prescriptive norms, which say what the society expects. The corpus yields 16,200 flows and 10,034 norms, gathered per-book into normative "universes".',
   },
   train: {
     label: 'Step 2',
     title: 'Train',
-    lead: 'Supervised fine-tuning first teaches the model to express its privacy reasoning in CI syntax. Two further arms then make that reasoning accountable to context, each trained from the same merged SFT checkpoint so that neither confounds the other: online GRPO against a modular reward grounded in the source novel’s normative universe, and offline KTO against desirability labels drawn from the same universe.',
+    lead: 'Supervised fine-tuning first teaches the model to express its privacy reasoning in CI syntax. We then design and apply (1) GRPO and (2) KTO reinforcement learning in an aim to make that reasoning accountable to context, each trained from the SFT checkpoint. GRPO is online, with a modular reward grounded in the source novel’s normative universe, and KTO is offline, using pre-computed desirability labels drawn from the same universe.',
   },
   evaluate: {
     label: 'Step 3',
     title: 'Evaluate',
     paragraphs: [
-      'We evaluate every fine-tuning stage on five existing CI-aligned benchmarks: PrivacyLens, ConfAIde, GoldCoin-HIPAA, CI-RL Vignettes, and VLM-GeoPrivacy. None of these benchmarks resemble the training texts, so improvements must come from transferable reasoning patterns rather than memorized scenarios.',
-      'The study spans 11 task LLMs from 2B to 20B parameters across five model families (Qwen3.5, Gemma4, Phi-4, GPT-OSS, and Llama3.1), including reasoning- and safety-specific fine-tunes. We pair the quantitative results with qualitative review of model completions.',
-      'Most of these comparisons do not resolve. The benchmarks are small, several metrics rest on an LLM judge, and sampling noise across seeds is large, so four of the five benchmarks have at least one major metric with no single best model. The figure keeps the paper’s markings: which cells are statistically tied for the top, and which runs mostly failed the output format. Where normative grounding does show is in the weights: on chunks neither RL arm saw, both double the alignment SFT buys.',
+      'We evaluate every fine-tuning stage on five existing CI-aligned benchmarks: PrivacyLens, ConfAIde, GoldCoin-HIPAA, CI-RL Vignettes, and VLM-GeoPrivacy. None of these benchmarks resemble the training texts, so we hypothesize that improvements would come from transferable reasoning patterns.',
+      'The study spans 11 task LLMs from 2B to 20B parameters across five model families (Qwen3.5, Gemma4, Phi-4, GPT-OSS, and Llama3.1), including reasoning- (OpenThinker3) and safety-specific (HARC) fine-tunes. We pair the quantitative results with qualitative review of model completions.',
+      'Most of these comparisons do not resolve. We found significant run-to-run variance in several benchmark results. The benchmarks are small, several metrics rest on an LLM judge, and sampling noise across seeds is large, so four of the five benchmarks have at least one major metric with no single best model. The figure keeps the paper’s markings: which cells are statistically tied for the top, and which runs mostly failed the output format. Where normative grounding does show is in the weights: on chunks neither RL arm saw, both double the alignment SFT buys.',
     ],
   },
 };

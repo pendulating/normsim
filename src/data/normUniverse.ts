@@ -75,7 +75,7 @@ export const steps: DiagramStep[] = [
   {
     label: 'Chunk',
     caption:
-      'Each novel is split on paragraph boundaries into chunks of at most 6,000 characters, each seeded with the last 1,000 characters of the chunk before it. The worked example is chunk 128 of the 156 in Pride and Prejudice.',
+      'Each novel is split on paragraph boundaries into chunks of at most 6,000 characters, each seeded with the last 1,000 characters of the chunk before it.',
     focus: ['chunks'],
     view: 'chunk',
   },
@@ -176,7 +176,7 @@ export const universes: Universe[] = [
 ];
 
 export const figureCaption =
-  'Step 1, Extract. Each novel is read in chunks; a reasoning pass analyses each chunk, an extraction pass turns that analysis into typed flows and norms, and the norms are aggregated into the book’s normative universe. The worked example is verbatim model output for one real chunk, and the norms shown are real extractions; the label on each gives its deontic force.';
+  '';
 
 /* ------------------------------------------------------------------------
    Worked example: one real chunk, followed through reasoning and extraction.
